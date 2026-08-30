@@ -1,0 +1,323 @@
+import { supabase, isSupabaseReady } from '../config/supabase.js';
+
+/**
+ * Place a new order with optional bank payment slip
+ */
+export async function createOrder(req, res, next) {
+  try {
+    const {
+      orderId,
+      customerName,
+      customerEmail,
+      customerPhone,
+      customerLocation,
+      deliveryAddress,
+      paymentMethod,
+      items,
+      totalLKR,
+      savingsLKR,
+      paymentSlipUrl,
+      paymentSlipPublicId,
+      paymentSlipName,
+      isGift,
+      giftMessage,
+      deliveryNotes
+    } = req.body;
+
+    if (!orderId || !customerName || !customerEmail || !items || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Incomplete order payload. Garment items, client name and email required.'
+      });
+    }
+
+    const isBankTransfer = (paymentMethod || '').toLowerCase().includes('bank');
+    const initialStatus = isBankTransfer
+      ? 'Pending Slip Verification'
+      : 'Payment Verified — Processing Dispatch';
+
+
+    const userId = req.user?.id || null;
+
+    // Construct full delivery address payload
+    const structuredAddress = {
+      location: customerLocation || `${deliveryAddress?.streetAddress || ''}, ${deliveryAddress?.city || ''}, ${deliveryAddress?.country || ''}`,
+      firstName: deliveryAddress?.firstName || customerName?.split(' ')[0] || '',
+      lastName: deliveryAddress?.lastName || customerName?.split(' ').slice(1).join(' ') || '',
+      recipientName: customerName,
+      email: customerEmail,
+      phone: customerPhone || deliveryAddress?.phone || '',
+      streetAddress: deliveryAddress?.streetAddress || customerLocation || '',
+      apartment: deliveryAddress?.apartment || '',
+      city: deliveryAddress?.city || 'Colombo',
+      postalCode: deliveryAddress?.postalCode || '',
+      country: deliveryAddress?.country || 'Sri Lanka',
+      deliveryNotes: deliveryNotes || deliveryAddress?.deliveryNotes || '',
+      isGift: Boolean(isGift),
+      giftMessage: giftMessage || ''
+    };
+
+    if (isSupabaseReady) {
+      // 1. Insert Order Master Record
+      const { data: order, error: orderErr } = await supabase
+        .from('orders')
+        .insert({
+          order_code: orderId,
+          user_id: userId,
+          customer_name: customerName,
+          customer_email: customerEmail,
+          customer_phone: customerPhone || '',
+          delivery_address: structuredAddress,
+          payment_method: isBankTransfer ? 'bank_transfer' : 'cod',
+          status: initialStatus,
+          subtotal_lkr: totalLKR,
+          discount_lkr: savingsLKR || 0,
+          grand_total_lkr: totalLKR,
+          has_slip_attached: Boolean(paymentSlipUrl),
+          payment_slip_url: paymentSlipUrl || null,
+          payment_slip_public_id: paymentSlipPublicId || null,
+          payment_slip_name: paymentSlipName || null,
+          slip_uploaded_at: paymentSlipUrl ? new Date().toISOString() : null
+        })
+        .select()
+        .single();
+
+      if (orderErr) throw orderErr;
+
+      // 2. Insert Order Line Items
+      const lineItems = items.map((item) => ({
+        order_id: order.id,
+        product_id: item.productId || item.id || null,
+        product_title: item.title || item.name,
+        color: item.color || 'Onyx Black',
+        size: item.selectedSize || item.size || 'M (40)',
+        unit_price_lkr: item.priceLKR || item.price || 18500,
+        original_price_lkr: item.originalPriceLKR || item.priceLKR || item.price || 18500,
+        quantity: item.quantity || item.qty || 1,
+        product_image_url: item.image || '/images/hero_tshirt.jpg'
+      }));
+
+      const { error: itemsErr } = await supabase
+        .from('order_items')
+        .insert(lineItems);
+
+      if (itemsErr) throw itemsErr;
+
+      // 3. Decrement live stock in product_stock for purchased garment sizes
+      for (const item of items) {
+        const prodId = item.productId || item.id;
+        const size = (item.selectedSize || item.size || '').trim();
+        const orderedQty = parseInt(item.quantity || item.qty || 1, 10);
+
+        if (prodId && size) {
+          try {
+            const { data: variants } = await supabase
+              .from('product_variants')
+              .select('id, color_name')
+              .eq('product_id', prodId);
+
+            if (variants && variants.length > 0) {
+              const matchedVariant = (item.color 
+                ? variants.find(v => v.color_name?.toLowerCase().trim() === item.color.toLowerCase().trim())
+                : null) || variants[0];
+
+              const variantId = matchedVariant.id;
+
+              const { data: stockRows } = await supabase
+                .from('product_stock')
+                .select('id, size_code, stock_quantity')
+                .eq('variant_id', variantId);
+
+              if (stockRows && stockRows.length > 0) {
+                const stockRow = stockRows.find(s => 
+                  s.size_code.toLowerCase().trim() === size.toLowerCase().trim() ||
+                  s.size_code.split(' ')[0].toLowerCase() === size.split(' ')[0].toLowerCase()
+                ) || stockRows[0];
+
+                if (stockRow) {
+                  const currentStock = Number(stockRow.stock_quantity) || 0;
+                  const newStock = Math.max(0, currentStock - orderedQty);
+                  await supabase
+                    .from('product_stock')
+                    .update({ stock_quantity: newStock })
+                    .eq('id', stockRow.id);
+                  
+                  console.log(`[Order #${orderId}] Reduced inventory for product ${prodId} size ${size}: ${currentStock} -> ${newStock}`);
+                }
+              }
+            }
+          } catch (stkErr) {
+            console.warn('Stock decrement notice:', stkErr);
+          }
+        }
+      }
+
+      return res.status(201).json({
+        success: true,
+        message: `Order #${orderId} confirmed, saved in Supabase, and stock decremented.`,
+        data: { ...order, items: lineItems }
+      });
+
+    }
+
+
+    // Development Fallback response
+    return res.status(201).json({
+      success: true,
+      message: `Order #${orderId} created in development mode.`,
+      data: req.body
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Get all orders (with item lines & slips)
+ */
+export async function getOrders(req, res, next) {
+  try {
+    if (!isSupabaseReady) {
+      return res.status(200).json({
+        success: true,
+        message: 'Dev mode: Supabase not connected yet.',
+        data: []
+      });
+    }
+
+    let query = supabase
+      .from('orders')
+      .select('*, order_items(*)')
+      .order('created_at', { ascending: false });
+
+    // If client (non-admin), restrict to their own user_id
+    const userRole = req.user?.user_metadata?.role || req.user?.role;
+    if (userRole !== 'admin' && userRole !== 'concierge' && req.user?.id) {
+      query = query.eq('user_id', req.user.id);
+    }
+
+    const { data: orders, error } = await query;
+    if (error) throw error;
+
+    res.status(200).json({
+      success: true,
+      data: orders
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Admin: Approve Bank Payment Slip
+ */
+export async function approvePaymentSlip(req, res, next) {
+  try {
+    const { orderCode } = req.params;
+
+    if (!isSupabaseReady) {
+      return res.status(200).json({
+        success: true,
+        message: `Slip for order #${orderCode} approved in dev mode.`,
+        data: { orderCode, status: 'Payment Verified — Processing Dispatch' }
+      });
+    }
+
+    const { data, error } = await supabase
+      .from('orders')
+      .update({
+        status: 'Payment Verified — Processing Dispatch',
+        slip_approved_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('order_code', orderCode)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.status(200).json({
+      success: true,
+      message: `Payment slip for order #${orderCode} verified and approved.`,
+      data
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Admin: Reject Bank Payment Slip (Request re-upload)
+ */
+export async function rejectPaymentSlip(req, res, next) {
+  try {
+    const { orderCode } = req.params;
+    const { reason } = req.body;
+
+    if (!isSupabaseReady) {
+      return res.status(200).json({
+        success: true,
+        message: `Slip for order #${orderCode} rejected in dev mode.`,
+        data: { orderCode, status: 'Slip Rejected — Awaiting New Receipt' }
+      });
+    }
+
+    const { data, error } = await supabase
+      .from('orders')
+      .update({
+        status: 'Slip Rejected — Awaiting New Receipt',
+        slip_rejection_reason: reason || 'Payment slip illegible or amount mismatched.',
+        updated_at: new Date().toISOString()
+      })
+      .eq('order_code', orderCode)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.status(200).json({
+      success: true,
+      message: `Payment slip for order #${orderCode} flagged as rejected.`,
+      data
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Update dispatch status
+ */
+export async function updateOrderStatus(req, res, next) {
+  try {
+    const { orderCode } = req.params;
+    const { status } = req.body;
+
+    if (!isSupabaseReady) {
+      return res.status(200).json({
+        success: true,
+        message: `Order #${orderCode} updated to ${status} in dev mode.`
+      });
+    }
+
+    const { data, error } = await supabase
+      .from('orders')
+      .update({
+        status,
+        updated_at: new Date().toISOString()
+      })
+      .eq('order_code', orderCode)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.status(200).json({
+      success: true,
+      message: `Order #${orderCode} status changed to ${status}.`,
+      data
+    });
+  } catch (err) {
+    next(err);
+  }
+}
