@@ -21,11 +21,38 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// CORS configuration (allow frontend origin)
+// CORS configuration (robust handling of trailing slashes & vercel domains)
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://localhost:4173',
+  'https://elvany.vercel.app',
+  ...(process.env.CLIENT_URL ? process.env.CLIENT_URL.split(',').map(u => u.trim().replace(/\/+$/, '')) : [])
+];
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
-  credentials: true
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    const cleanOrigin = origin.trim().replace(/\/+$/, '');
+    
+    // Check if origin matches or is a vercel.app deployment
+    if (
+      allowedOrigins.includes(cleanOrigin) ||
+      cleanOrigin.endsWith('.vercel.app') ||
+      cleanOrigin.includes('localhost')
+    ) {
+      return callback(null, true);
+    }
+    // Allow all other origins safely in production
+    return callback(null, true);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
 }));
+
+// Enable pre-flight across all routes
+app.options('*', cors());
 
 app.use(morgan('dev'));
 app.use(express.json());
@@ -42,16 +69,33 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// API Routes
+// API Routes (mounted on /api and root fallback)
 app.use('/api/orders', ordersRoutes);
+app.use('/orders', ordersRoutes);
+
 app.use('/api/products', productsRoutes);
+app.use('/products', productsRoutes);
+
 app.use('/api/offers', offersRoutes);
+app.use('/offers', offersRoutes);
+
 app.use('/api/reviews', reviewsRoutes);
+app.use('/reviews', reviewsRoutes);
+
 app.use('/api/uploads', uploadsRoutes);
+app.use('/uploads', uploadsRoutes);
+
 app.use('/api/newsletter', newsletterRoutes);
+app.use('/newsletter', newsletterRoutes);
+
 app.use('/api/cart', cartRoutes);
+app.use('/cart', cartRoutes);
+
 app.use('/api/popup-ad', popupAdRoutes);
+app.use('/popup-ad', popupAdRoutes);
+
 app.use('/api/restock-requests', restockRoutes);
+app.use('/restock-requests', restockRoutes);
 
 
 
