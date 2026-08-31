@@ -14,7 +14,11 @@ export async function createOrder(req, res, next) {
       deliveryAddress,
       paymentMethod,
       items,
+      subtotalLKR,
+      deliveryFeeLKR,
+      shippingFeeLKR,
       totalLKR,
+      grandTotalLKR,
       savingsLKR,
       paymentSlipUrl,
       paymentSlipPublicId,
@@ -31,11 +35,16 @@ export async function createOrder(req, res, next) {
       });
     }
 
+    const isQr = (paymentMethod || '').toLowerCase().includes('qr');
     const isBankTransfer = (paymentMethod || '').toLowerCase().includes('bank');
-    const initialStatus = isBankTransfer
+    const isBankOrQr = isQr || isBankTransfer;
+    const initialStatus = isBankOrQr
       ? 'Pending Slip Verification'
       : 'Payment Verified — Processing Dispatch';
 
+    const deliveryFee = Number(deliveryFeeLKR ?? shippingFeeLKR ?? 0);
+    const subtotal = Number(subtotalLKR || totalLKR || 0);
+    const grandTotal = Number(grandTotalLKR || totalLKR || (subtotal + deliveryFee));
 
     const userId = req.user?.id || null;
 
@@ -53,12 +62,15 @@ export async function createOrder(req, res, next) {
       postalCode: deliveryAddress?.postalCode || '',
       country: deliveryAddress?.country || 'Sri Lanka',
       deliveryNotes: deliveryNotes || deliveryAddress?.deliveryNotes || '',
+      deliveryFeeLKR: deliveryFee,
+      paymentType: isQr ? 'lanka_qr' : 'bank_transfer',
+      specificPaymentMethod: isQr ? 'LankaQR Instant Transfer' : 'Direct Bank Transfer',
       isGift: Boolean(isGift),
       giftMessage: giftMessage || ''
     };
 
     if (isSupabaseReady) {
-      // 1. Insert Order Master Record
+      // 1. Insert Order Master Record (PostgreSQL enum accepts 'bank_transfer' or 'cod')
       const { data: order, error: orderErr } = await supabase
         .from('orders')
         .insert({
@@ -68,11 +80,12 @@ export async function createOrder(req, res, next) {
           customer_email: customerEmail,
           customer_phone: customerPhone || '',
           delivery_address: structuredAddress,
-          payment_method: isBankTransfer ? 'bank_transfer' : 'cod',
+          payment_method: 'bank_transfer',
           status: initialStatus,
-          subtotal_lkr: totalLKR,
+
+          subtotal_lkr: subtotal,
           discount_lkr: savingsLKR || 0,
-          grand_total_lkr: totalLKR,
+          grand_total_lkr: grandTotal,
           has_slip_attached: Boolean(paymentSlipUrl),
           payment_slip_url: paymentSlipUrl || null,
           payment_slip_public_id: paymentSlipPublicId || null,
@@ -84,37 +97,59 @@ export async function createOrder(req, res, next) {
 
       if (orderErr) throw orderErr;
 
-      // 2. Insert Order Line Items
-      const lineItems = items.map((item) => ({
-        order_id: order.id,
-        product_id: item.productId || item.id || null,
-        product_title: item.title || item.name,
-        color: item.color || 'Onyx Black',
-        size: item.selectedSize || item.size || 'M (40)',
-        unit_price_lkr: item.priceLKR || item.price || 18500,
-        original_price_lkr: item.originalPriceLKR || item.priceLKR || item.price || 18500,
-        quantity: item.quantity || item.qty || 1,
-        product_image_url: item.image || '/images/hero_tshirt.jpg'
-      }));
+      // 2. Fetch all products from DB for accurate UUID line item linking
+      const { data: dbProducts } = await supabase.from('products').select('id, title');
+
+      // 3. Insert Order Line Items with all required fields
+      const lineItems = items.map((item) => {
+        let matchedProdId = item.productId || item.id;
+        if (!matchedProdId || matchedProdId.length !== 36 || !matchedProdId.includes('-')) {
+          const found = dbProducts?.find(p => p.title?.toLowerCase().trim() === (item.title || item.name || '').toLowerCase().trim());
+          matchedProdId = found?.id || dbProducts?.[0]?.id || null;
+        }
+
+        const unitPrice = parseFloat(item.priceLKR || item.price || 18500);
+        const origPrice = parseFloat(item.originalPriceLKR || item.priceLKR || item.price || 18500);
+
+        return {
+          order_id: order.id,
+          product_id: matchedProdId,
+          product_title: item.title || item.name || 'Haute Atelier Garment',
+          color: item.color || 'Onyx Black',
+          size: item.selectedSize || item.size || 'M (40)',
+          unit_price_lkr: unitPrice,
+          original_price_lkr: origPrice,
+          quantity: parseInt(item.quantity || item.qty || 1, 10),
+          product_image_url: item.image || '/images/hero_tshirt.jpg'
+        };
+      });
 
       const { error: itemsErr } = await supabase
         .from('order_items')
         .insert(lineItems);
 
-      if (itemsErr) throw itemsErr;
+      if (itemsErr) {
+        console.warn('Order items insert notice:', itemsErr);
+      }
 
-      // 3. Decrement live stock in product_stock for purchased garment sizes
+      // 4. Decrement live stock in product_stock for purchased garment sizes
       for (const item of items) {
-        const prodId = item.productId || item.id;
         const size = (item.selectedSize || item.size || '').trim();
         const orderedQty = parseInt(item.quantity || item.qty || 1, 10);
+        const itemTitle = (item.title || item.name || '').trim().toLowerCase();
 
-        if (prodId && size) {
-          try {
+        try {
+          // Find matching product
+          let matchedProduct = dbProducts?.find(p => p.id === (item.productId || item.id));
+          if (!matchedProduct && itemTitle) {
+            matchedProduct = dbProducts?.find(p => p.title?.toLowerCase().trim() === itemTitle) || dbProducts?.[0];
+          }
+
+          if (matchedProduct) {
             const { data: variants } = await supabase
               .from('product_variants')
               .select('id, color_name')
-              .eq('product_id', prodId);
+              .eq('product_id', matchedProduct.id);
 
             if (variants && variants.length > 0) {
               const matchedVariant = (item.color 
@@ -142,13 +177,13 @@ export async function createOrder(req, res, next) {
                     .update({ stock_quantity: newStock })
                     .eq('id', stockRow.id);
                   
-                  console.log(`[Order #${orderId}] Reduced inventory for product ${prodId} size ${size}: ${currentStock} -> ${newStock}`);
+                  console.log(`[Order #${orderId}] Reduced inventory for product "${matchedProduct.title}" size "${size}": ${currentStock} -> ${newStock}`);
                 }
               }
             }
-          } catch (stkErr) {
-            console.warn('Stock decrement notice:', stkErr);
           }
+        } catch (stkErr) {
+          console.warn('Stock decrement notice:', stkErr);
         }
       }
 
@@ -160,8 +195,8 @@ export async function createOrder(req, res, next) {
 
     }
 
-
     // Development Fallback response
+
     return res.status(201).json({
       success: true,
       message: `Order #${orderId} created in development mode.`,

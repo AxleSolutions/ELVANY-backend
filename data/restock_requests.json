@@ -1,0 +1,44 @@
+[
+  {
+    "id": "req-1788169290957-847",
+    "productId": "63f28e68-8bc2-412f-8ddf-85f1a84533b6",
+    "productTitle": "g fvxc",
+    "productImage": "https://res.cloudinary.com/loy2zjsr/image/upload/v1788065022/elvany/products/qken4kngvii3bs78zxg2.jpg",
+    "variantColor": "Onyx Black",
+    "sizeCode": "M (40)",
+    "customerName": "Pasidu Chamod",
+    "customerEmail": "pasiduchamodj@gmail.com",
+    "customerPhone": "0712345678",
+    "notes": "ewvdsxcz",
+    "status": "Restocked / Ready",
+    "createdAt": "2026-08-31T09:41:30.957Z"
+  },
+  {
+    "id": "req-1788169218266-649",
+    "productId": "tee-velvet-01",
+    "productTitle": "Royal Velvet Oversized Tee",
+    "productImage": "/images/hero_tshirt.jpg",
+    "variantColor": "Midnight Navy",
+    "sizeCode": "XL (44)",
+    "customerName": "Senesh Fernando",
+    "customerEmail": "senesh@concierge.lk",
+    "customerPhone": "077 555 1234",
+    "notes": "Need 3 pieces for private event next month",
+    "status": "In Production / Sourcing",
+    "createdAt": "2026-08-31T09:40:18.266Z"
+  },
+  {
+    "id": "req-1788168861216-747",
+    "productId": "prod-99",
+    "productTitle": "Pure Silk Midnight Kimono Tee",
+    "productImage": "/images/hero_tshirt.jpg",
+    "variantColor": "Onyx Black",
+    "sizeCode": "L (42)",
+    "customerName": "Christian Jayasuriya",
+    "customerEmail": "christian@maison.lk",
+    "customerPhone": "+94 77 987 6543",
+    "notes": "Please inform me as soon as 2 pieces become available.",
+    "status": "Pending Atelier Review",
+    "createdAt": "2026-08-31T09:34:21.216Z"
+  }
+]
