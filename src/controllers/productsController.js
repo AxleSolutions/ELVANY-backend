@@ -79,36 +79,50 @@ export async function createProduct(req, res, next) {
 
     if (prodErr) throw prodErr;
 
-    // 2. Insert variant record with Cloudinary images
-    const primaryImg = productData.image || (Array.isArray(productData.images) ? productData.images[0] : null) || '/images/hero_tshirt.jpg';
-    const otherImgs = (Array.isArray(productData.images) ? productData.images : []).filter(img => img && img !== primaryImg);
-    const images = [primaryImg, ...otherImgs];
+    // 2. Insert variant records with ordered Cloudinary images & colors
+    const images = Array.isArray(productData.images) && productData.images.length > 0
+      ? productData.images
+      : [productData.image || '/images/hero_tshirt.jpg'];
 
-    const { data: variant, error: varErr } = await supabase
-      .from('product_variants')
-      .insert({
-        product_id: insertedProduct.id,
-        color_name: productData.color || 'Onyx Black',
-        color_hex: productData.colorHex || '#141518',
-        is_default: true,
-        gallery_images: images
-      })
-      .select()
-      .single();
+    const colorsList = Array.isArray(productData.colors) && productData.colors.length > 0
+      ? productData.colors
+      : [{ name: productData.color || 'Onyx Black', hex: productData.colorHex || '#121316', isDefault: true }];
 
-    if (varErr) throw varErr;
+    let primaryVariantId = null;
 
+    for (let i = 0; i < colorsList.length; i++) {
+      const col = colorsList[i];
+      const isDefault = Boolean(col.isDefault) || i === 0;
 
-    // 3. Insert stock rows for each size
-    if (productData.inventory && typeof productData.inventory === 'object') {
-      const stockRows = Object.entries(productData.inventory).map(([sizeCode, qty]) => ({
-        variant_id: variant.id,
-        size_code: sizeCode,
-        stock_quantity: Math.max(0, parseInt(qty, 10) || 0)
-      }));
+      const { data: variant, error: varErr } = await supabase
+        .from('product_variants')
+        .insert({
+          product_id: insertedProduct.id,
+          color_name: col.name || 'Onyx Black',
+          color_hex: col.hex || '#121316',
+          is_default: isDefault,
+          gallery_images: images
+        })
+        .select()
+        .single();
 
-      if (stockRows.length > 0) {
-        await supabase.from('product_stock').insert(stockRows);
+      if (varErr) {
+        console.warn('Variant insertion warning:', varErr);
+      } else if (variant) {
+        if (isDefault || !primaryVariantId) primaryVariantId = variant.id;
+
+        // Insert stock rows for this variant
+        if (productData.inventory && typeof productData.inventory === 'object') {
+          const stockRows = Object.entries(productData.inventory).map(([sizeCode, qty]) => ({
+            variant_id: variant.id,
+            size_code: sizeCode,
+            stock_quantity: Math.max(0, parseInt(qty, 10) || 0)
+          }));
+
+          if (stockRows.length > 0) {
+            await supabase.from('product_stock').insert(stockRows);
+          }
+        }
       }
     }
 
@@ -162,10 +176,13 @@ export async function updateProduct(req, res, next) {
 
     if (updateErr) throw updateErr;
 
-    // 2. Update variant images & stock
-    const primaryImg = productData.image || (Array.isArray(productData.images) ? productData.images[0] : null) || '/images/hero_tshirt.jpg';
-    const otherImgs = (Array.isArray(productData.images) ? productData.images : []).filter(img => img && img !== primaryImg);
-    const images = [primaryImg, ...otherImgs];
+    // 2. Update variant images & colors
+    const images = Array.isArray(productData.images) && productData.images.length > 0
+      ? productData.images
+      : [productData.image || '/images/hero_tshirt.jpg'];
+
+    const defaultColorName = productData.color || (productData.colors?.[0]?.name) || 'Onyx Black';
+    const defaultColorHex = productData.colorHex || (productData.colors?.[0]?.hex) || '#121316';
 
     let { data: variant } = await supabase
       .from('product_variants')
@@ -177,9 +194,12 @@ export async function updateProduct(req, res, next) {
     if (variant) {
       await supabase
         .from('product_variants')
-        .update({ gallery_images: images })
+        .update({ 
+          gallery_images: images,
+          color_name: defaultColorName,
+          color_hex: defaultColorHex
+        })
         .eq('id', variant.id);
-
 
       if (productData.inventory && typeof productData.inventory === 'object') {
         for (const [sizeCode, qty] of Object.entries(productData.inventory)) {
@@ -190,6 +210,30 @@ export async function updateProduct(req, res, next) {
               size_code: sizeCode,
               stock_quantity: Math.max(0, parseInt(qty, 10) || 0)
             }, { onConflict: 'variant_id,size_code' });
+        }
+      }
+    } else {
+      // Create primary variant if not existing
+      const { data: newVar } = await supabase
+        .from('product_variants')
+        .insert({
+          product_id: id,
+          color_name: defaultColorName,
+          color_hex: defaultColorHex,
+          is_default: true,
+          gallery_images: images
+        })
+        .select()
+        .single();
+
+      if (newVar && productData.inventory && typeof productData.inventory === 'object') {
+        const stockRows = Object.entries(productData.inventory).map(([sizeCode, qty]) => ({
+          variant_id: newVar.id,
+          size_code: sizeCode,
+          stock_quantity: Math.max(0, parseInt(qty, 10) || 0)
+        }));
+        if (stockRows.length > 0) {
+          await supabase.from('product_stock').insert(stockRows);
         }
       }
     }

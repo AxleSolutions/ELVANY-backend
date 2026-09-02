@@ -12,6 +12,7 @@ import newsletterRoutes from './src/routes/newsletterRoutes.js';
 import cartRoutes from './src/routes/cartRoutes.js';
 import popupAdRoutes from './src/routes/popupAdRoutes.js';
 import restockRoutes from './src/routes/restockRoutes.js';
+import bespokeRoutes from './src/routes/bespokeRoutes.js';
 import { errorHandler } from './src/middlewares/errorHandler.js';
 import { isSupabaseReady } from './src/config/supabase.js';
 import { isCloudinaryReady } from './src/config/cloudinary.js';
@@ -96,6 +97,9 @@ app.use('/popup-ad', popupAdRoutes);
 
 app.use('/api/restock-requests', restockRoutes);
 app.use('/restock-requests', restockRoutes);
+
+app.use('/api/bespoke', bespokeRoutes);
+app.use('/bespoke', bespokeRoutes);
 
 
 

@@ -48,7 +48,7 @@ export async function createOrder(req, res, next) {
 
     const userId = req.user?.id || null;
 
-    // Construct full delivery address payload
+    // Construct full delivery address payload with rich item specs preserved
     const structuredAddress = {
       location: customerLocation || `${deliveryAddress?.streetAddress || ''}, ${deliveryAddress?.city || ''}, ${deliveryAddress?.country || ''}`,
       firstName: deliveryAddress?.firstName || customerName?.split(' ')[0] || '',
@@ -66,7 +66,8 @@ export async function createOrder(req, res, next) {
       paymentType: isQr ? 'lanka_qr' : 'bank_transfer',
       specificPaymentMethod: isQr ? 'LankaQR Instant Transfer' : 'Direct Bank Transfer',
       isGift: Boolean(isGift),
-      giftMessage: giftMessage || ''
+      giftMessage: giftMessage || '',
+      orderedItems: items || []
     };
 
     if (isSupabaseReady) {
@@ -234,9 +235,40 @@ export async function getOrders(req, res, next) {
     const { data: orders, error } = await query;
     if (error) throw error;
 
+    const formattedOrders = (orders || []).map(o => {
+      const storedItems = o.delivery_address?.orderedItems || [];
+      const lineItems = (o.order_items || []).map(li => {
+        const matched = storedItems.find(si => (si.id === li.product_id || (si.name || si.title) === li.product_title || (si.designCode && li.product_title?.includes(si.designCode))));
+        return {
+          id: li.id,
+          productId: li.product_id,
+          title: li.product_title,
+          name: li.product_title,
+          color: li.color,
+          size: li.size,
+          priceLKR: li.unit_price_lkr,
+          originalPriceLKR: li.original_price_lkr,
+          quantity: li.quantity,
+          image: li.product_image_url || matched?.image || '/images/hero_tshirt.jpg',
+          isBespokeCustom: matched?.isBespokeCustom || Boolean(matched?.designCode) || (li.product_title || '').toLowerCase().includes('custom') || (li.product_title || '').toLowerCase().includes('bespoke'),
+          designCode: matched?.designCode || (li.product_title?.match(/BL-[A-Z0-9]{4,6}/)?.[0]) || null,
+          fabric: matched?.fabric || matched?.fabricName || null,
+          cut: matched?.cut || matched?.cutName || null,
+          customPlacements: matched?.customPlacements || [],
+          customNotes: matched?.customNotes || matched?.notes || null,
+          artworks: matched?.artworks || {}
+        };
+      });
+
+      return {
+        ...o,
+        items: lineItems.length > 0 ? lineItems : storedItems
+      };
+    });
+
     res.status(200).json({
       success: true,
-      data: orders
+      data: formattedOrders
     });
   } catch (err) {
     next(err);

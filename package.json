@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch-path=src --watch-path=server.js server.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.48.1",
