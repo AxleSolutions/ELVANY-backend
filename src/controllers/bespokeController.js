@@ -99,6 +99,8 @@ async function getAllBespokeFromSources() {
             customerEmail: d.customer_email || d.customerEmail || '',
             customerPhone: d.customer_phone || d.customerPhone || '',
             status: d.status || 'Saved / Ready to Order',
+            views: d.views || { front: d.preview_thumbnail || d.previewThumbnail, back: null, left: null, right: null, collage: d.preview_thumbnail || d.previewThumbnail },
+            blueprintImage: d.blueprint_image || d.blueprintImage || d.preview_thumbnail || d.previewThumbnail || null,
             previewThumbnail: d.preview_thumbnail || d.previewThumbnail || null,
             createdAt: d.created_at || d.createdAt || new Date().toISOString(),
             updatedAt: d.updated_at || d.updatedAt || new Date().toISOString()
@@ -130,6 +132,14 @@ async function getAllBespokeFromSources() {
               const code = item.designCode || matchedStored?.designCode || title.match(/BL-[A-Z0-9]{4,6}/)?.[0] || `BL-${(order.order_code || order.id).slice(-4)}`;
               
               if (!map.has(code)) {
+                const viewsObj = matchedStored?.views || item.views || {
+                  front: item.product_image_url || item.image || matchedStored?.image,
+                  back: null,
+                  left: null,
+                  right: null,
+                  collage: matchedStored?.blueprintImage || item.blueprintImage || item.product_image_url || item.image
+                };
+
                 map.set(code, {
                   id: `order-bespoke-${order.id}-${item.id || code}`,
                   designCode: code,
@@ -153,7 +163,9 @@ async function getAllBespokeFromSources() {
                   customerEmail: order.customer_email || '',
                   customerPhone: order.customer_phone || '',
                   status: order.status || 'Ordered / In Production',
-                  previewThumbnail: item.product_image_url || item.image || matchedStored?.image || null,
+                  views: viewsObj,
+                  blueprintImage: matchedStored?.blueprintImage || item.blueprintImage || viewsObj?.collage || item.product_image_url || item.image || null,
+                  previewThumbnail: matchedStored?.blueprintImage || item.blueprintImage || viewsObj?.collage || item.product_image_url || item.image || matchedStored?.image || null,
                   createdAt: order.created_at || new Date().toISOString(),
                   updatedAt: order.created_at || new Date().toISOString()
                 });
@@ -163,7 +175,7 @@ async function getAllBespokeFromSources() {
         });
       }
     } catch (orderScanErr) {
-      console.warn('Orders bespoke scan notice:', orderScanErr);
+      console.warn('Supabase orders scan notice for bespoke creations:', orderScanErr);
     }
   }
 
@@ -197,6 +209,8 @@ export async function createBespokeDesign(req, res, next) {
       customerEmail,
       customerPhone,
       previewThumbnail,
+      blueprintImage,
+      views,
       status
     } = req.body;
 
@@ -226,6 +240,8 @@ export async function createBespokeDesign(req, res, next) {
       customerName: (customerName || 'VIP Guest').trim(),
       customerEmail: (customerEmail || '').trim(),
       customerPhone: (customerPhone || '').trim(),
+      views: views || (previewThumbnail ? { front: previewThumbnail, back: null, left: null, right: null, collage: previewThumbnail } : null),
+      blueprintImage: blueprintImage || previewThumbnail || null,
       previewThumbnail: previewThumbnail || null,
       status: status || 'Saved / Ready to Order',
       createdAt: timestamp,
