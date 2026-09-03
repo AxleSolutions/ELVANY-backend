@@ -35,10 +35,13 @@ export async function createOrder(req, res, next) {
       });
     }
 
+    const isCard = (paymentMethod || '').toLowerCase().includes('card') || (paymentMethod || '').toLowerCase().includes('payhere');
     const isQr = (paymentMethod || '').toLowerCase().includes('qr');
     const isBankTransfer = (paymentMethod || '').toLowerCase().includes('bank');
     const isBankOrQr = isQr || isBankTransfer;
-    const initialStatus = isBankOrQr
+    const initialStatus = isCard
+      ? (req.body.isPaid ? 'Payment Verified — Processing Dispatch' : 'Payment Verified — Processing Dispatch')
+      : isBankOrQr
       ? 'Pending Slip Verification'
       : 'Payment Verified — Processing Dispatch';
 
@@ -63,15 +66,15 @@ export async function createOrder(req, res, next) {
       country: deliveryAddress?.country || 'Sri Lanka',
       deliveryNotes: deliveryNotes || deliveryAddress?.deliveryNotes || '',
       deliveryFeeLKR: deliveryFee,
-      paymentType: isQr ? 'lanka_qr' : 'bank_transfer',
-      specificPaymentMethod: isQr ? 'LankaQR Instant Transfer' : 'Direct Bank Transfer',
+      paymentType: isCard ? 'card' : isQr ? 'lanka_qr' : 'bank_transfer',
+      specificPaymentMethod: isCard ? 'PayHere Secure Online Card Payment' : isQr ? 'LankaQR Instant Transfer' : 'Direct Bank Transfer',
       isGift: Boolean(isGift),
       giftMessage: giftMessage || '',
       orderedItems: items || []
     };
 
     if (isSupabaseReady) {
-      // 1. Insert Order Master Record (PostgreSQL enum accepts 'bank_transfer' or 'cod')
+      // 1. Insert Order Master Record (PostgreSQL enum accepts 'bank_transfer', 'cod', 'card')
       const { data: order, error: orderErr } = await supabase
         .from('orders')
         .insert({
@@ -81,7 +84,7 @@ export async function createOrder(req, res, next) {
           customer_email: customerEmail,
           customer_phone: customerPhone || '',
           delivery_address: structuredAddress,
-          payment_method: 'bank_transfer',
+          payment_method: isCard ? 'card' : 'bank_transfer',
           status: initialStatus,
 
           subtotal_lkr: subtotal,
@@ -121,7 +124,7 @@ export async function createOrder(req, res, next) {
           unit_price_lkr: unitPrice,
           original_price_lkr: origPrice,
           quantity: parseInt(item.quantity || item.qty || 1, 10),
-          product_image_url: item.image || '/images/hero_tshirt.jpg'
+          product_image_url: item.image || '/images/hero_tshirt.webp'
         };
       });
 
@@ -249,7 +252,7 @@ export async function getOrders(req, res, next) {
           priceLKR: li.unit_price_lkr,
           originalPriceLKR: li.original_price_lkr,
           quantity: li.quantity,
-          image: li.product_image_url || matched?.image || '/images/hero_tshirt.jpg',
+          image: li.product_image_url || matched?.image || '/images/hero_tshirt.webp',
           isBespokeCustom: matched?.isBespokeCustom || Boolean(matched?.designCode) || (li.product_title || '').toLowerCase().includes('custom') || (li.product_title || '').toLowerCase().includes('bespoke'),
           designCode: matched?.designCode || (li.product_title?.match(/BL-[A-Z0-9]{4,6}/)?.[0]) || null,
           fabric: matched?.fabric || matched?.fabricName || null,
@@ -260,8 +263,13 @@ export async function getOrders(req, res, next) {
         };
       });
 
+      const trackingNumber = o.tracking_number || o.delivery_address?.trackingNumber || (o.courier_notes?.match(/(?:Citypak|Tracking|Citypak Tracking)[\s:]*([A-Za-z0-9\-]+)/i)?.[1]) || o.courier_notes || null;
+
       return {
         ...o,
+        orderId: o.order_code,
+        trackingNumber,
+        tracking_number: trackingNumber,
         items: lineItems.length > 0 ? lineItems : storedItems
       };
     });
@@ -358,31 +366,85 @@ export async function rejectPaymentSlip(req, res, next) {
 export async function updateOrderStatus(req, res, next) {
   try {
     const { orderCode } = req.params;
-    const { status } = req.body;
+    const { status, trackingNumber, tracking_number } = req.body;
+    const resolvedTracking = trackingNumber || tracking_number || null;
 
     if (!isSupabaseReady) {
       return res.status(200).json({
         success: true,
-        message: `Order #${orderCode} updated to ${status} in dev mode.`
+        message: `Order #${orderCode} updated to ${status} in dev mode.`,
+        data: { orderCode, status, trackingNumber: resolvedTracking }
       });
     }
 
-    const { data, error } = await supabase
+    // Fetch existing order to merge delivery_address
+    const { data: existing } = await supabase
       .from('orders')
-      .update({
-        status,
-        updated_at: new Date().toISOString()
-      })
+      .select('delivery_address, courier_notes')
       .eq('order_code', orderCode)
-      .select()
-      .single();
+      .maybeSingle();
 
-    if (error) throw error;
+    const updatePayload = {
+      status,
+      updated_at: new Date().toISOString()
+    };
+
+    let data;
+
+    if (trackingNumber !== undefined || tracking_number !== undefined) {
+      const cleanTrack = resolvedTracking ? String(resolvedTracking).trim() : null;
+      const mergedAddress = typeof existing?.delivery_address === 'object' && existing.delivery_address !== null
+        ? { ...existing.delivery_address, trackingNumber: cleanTrack }
+        : { trackingNumber: cleanTrack };
+      updatePayload.delivery_address = mergedAddress;
+      updatePayload.courier_notes = cleanTrack ? `Citypak: ${cleanTrack}` : null;
+
+      // 1. Attempt update directly with tracking_number column
+      const attempt = await supabase
+        .from('orders')
+        .update({ ...updatePayload, tracking_number: cleanTrack })
+        .eq('order_code', orderCode)
+        .select()
+        .single();
+
+      if (!attempt.error) {
+        data = attempt.data;
+      } else if (attempt.error.code === 'PGRST204') {
+        // Fallback if tracking_number column hasn't been added to Supabase orders table yet
+        const fallback = await supabase
+          .from('orders')
+          .update(updatePayload)
+          .eq('order_code', orderCode)
+          .select()
+          .single();
+        if (fallback.error) throw fallback.error;
+        data = fallback.data;
+      } else {
+        throw attempt.error;
+      }
+    } else {
+      const standard = await supabase
+        .from('orders')
+        .update(updatePayload)
+        .eq('order_code', orderCode)
+        .select()
+        .single();
+      if (standard.error) throw standard.error;
+      data = standard.data;
+    }
+
+    const finalTracking = (trackingNumber !== undefined || tracking_number !== undefined)
+      ? (resolvedTracking ? String(resolvedTracking).trim() : null)
+      : (data.tracking_number || data.delivery_address?.trackingNumber || null);
 
     res.status(200).json({
       success: true,
       message: `Order #${orderCode} status changed to ${status}.`,
-      data
+      data: {
+        ...data,
+        trackingNumber: finalTracking,
+        tracking_number: finalTracking
+      }
     });
   } catch (err) {
     next(err);

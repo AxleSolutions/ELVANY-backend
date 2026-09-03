@@ -9,7 +9,7 @@ const DATA_FILE = path.join(__dirname, '../../data/popup_ad.json');
 
 const DEFAULT_POPUP_AD = {
   enabled: true,
-  imageUrl: '/images/editorial_brutalist.jpg',
+  imageUrl: '/images/editorial_brutalist.webp',
   targetUrl: '/collection',
   altText: 'ELVANY Haute Couture Capsule Release',
   showOncePerSession: true,
@@ -61,7 +61,7 @@ export async function getPopupAd(req, res, next) {
 
           const dbSettings = {
             enabled: data.is_active !== false,
-            imageUrl: data.badge_label || '/images/editorial_brutalist.jpg',
+            imageUrl: data.badge_label || '/images/editorial_brutalist.webp',
             targetUrl: targetUrl || '/collection',
             altText: data.title || 'ELVANY Seasonal Advertisement',
             showOncePerSession: true,
@@ -94,7 +94,7 @@ export async function updatePopupAd(req, res, next) {
 
     const updatedData = {
       enabled: enabled !== false,
-      imageUrl: imageUrl || '/images/editorial_brutalist.jpg',
+      imageUrl: imageUrl || '/images/editorial_brutalist.webp',
       targetUrl: targetUrl || '/collection',
       altText: altText || 'ELVANY Seasonal Advertisement',
       showOncePerSession: showOncePerSession !== false,

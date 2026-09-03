@@ -13,7 +13,56 @@ export async function getProducts(req, res, next) {
 
     if (error) throw error;
 
-    res.status(200).json({ success: true, data: products });
+    // Attach active promotion offers directly to matching products
+    const { data: promotions } = await supabase
+      .from('promotions')
+      .select('*')
+      .eq('is_active', true);
+
+    const now = new Date();
+    const activePromos = (promotions || []).filter(pr => {
+      if (pr.expires_at && new Date(pr.expires_at) < now) return false;
+      return true;
+    });
+
+    const enrichedProducts = (products || []).map(p => {
+      const origPrice = parseFloat(p.original_price_lkr || p.base_price_lkr || 18500);
+      const basePrice = parseFloat(p.base_price_lkr || origPrice);
+
+      const matchedPromo = activePromos.find(pr => 
+        (Array.isArray(pr.applied_product_ids) && pr.applied_product_ids.includes(p.id)) ||
+        (p.is_offer_applied && activePromos.length === 1)
+      );
+
+      if (matchedPromo) {
+        const discVal = parseFloat(matchedPromo.discount_value || 0);
+        let offPrice = basePrice;
+        if (matchedPromo.discount_type === 'percentage') {
+          offPrice = Math.round(basePrice * (1 - discVal / 100));
+        } else {
+          offPrice = Math.max(0, basePrice - discVal);
+        }
+
+        return {
+          ...p,
+          is_offer_applied: true,
+          offer_price_lkr: offPrice,
+          offerPriceLKR: offPrice,
+          original_price_lkr: basePrice > offPrice ? basePrice : origPrice,
+          originalPriceLKR: basePrice > offPrice ? basePrice : origPrice,
+          discount_value: discVal,
+          discount_type: matchedPromo.discount_type || 'fixed_amount',
+          discount_tag: matchedPromo.discount_type === 'percentage' 
+            ? `SAVE ${discVal}%` 
+            : `SAVE LKR ${discVal.toLocaleString()}`,
+          offer_code: matchedPromo.code
+        };
+      }
+
+      return p;
+    });
+
+    res.status(200).json({ success: true, data: enrichedProducts });
   } catch (err) {
     next(err);
   }
@@ -82,7 +131,7 @@ export async function createProduct(req, res, next) {
     // 2. Insert variant records with ordered Cloudinary images & colors
     const images = Array.isArray(productData.images) && productData.images.length > 0
       ? productData.images
-      : [productData.image || '/images/hero_tshirt.jpg'];
+      : [productData.image || '/images/hero_tshirt.webp'];
 
     const colorsList = Array.isArray(productData.colors) && productData.colors.length > 0
       ? productData.colors
@@ -179,7 +228,7 @@ export async function updateProduct(req, res, next) {
     // 2. Update variant images & colors
     const images = Array.isArray(productData.images) && productData.images.length > 0
       ? productData.images
-      : [productData.image || '/images/hero_tshirt.jpg'];
+      : [productData.image || '/images/hero_tshirt.webp'];
 
     const defaultColorName = productData.color || (productData.colors?.[0]?.name) || 'Onyx Black';
     const defaultColorHex = productData.colorHex || (productData.colors?.[0]?.hex) || '#121316';

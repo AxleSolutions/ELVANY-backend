@@ -36,9 +36,9 @@ const SEED_PRODUCTS = [
         color_hex: '#141518',
         is_default: true,
         gallery_images: [
-          '/images/hero_tshirt.jpg',
-          '/images/model_tshirt.jpg',
-          '/images/craft_canvas.jpg'
+          '/images/hero_tshirt.webp',
+          '/images/model_tshirt.webp',
+          '/images/craft_canvas.webp'
         ],
         sizes: [
           { size_code: 'S (38)', stock_quantity: 14, chest_measure_cm: 104, length_measure_cm: 71 },
@@ -53,8 +53,8 @@ const SEED_PRODUCTS = [
         color_hex: '#f5f5f7',
         is_default: false,
         gallery_images: [
-          '/images/tshirt_white.jpg',
-          '/images/craft_canvas.jpg'
+          '/images/tshirt_white.webp',
+          '/images/craft_canvas.webp'
         ],
         sizes: [
           { size_code: 'S (38)', stock_quantity: 10, chest_measure_cm: 104, length_measure_cm: 71 },
@@ -95,8 +95,8 @@ const SEED_PRODUCTS = [
         color_hex: '#c5a059',
         is_default: true,
         gallery_images: [
-          '/images/pillar_knitwear.jpg',
-          '/images/craft_canvas.jpg'
+          '/images/pillar_knitwear.webp',
+          '/images/craft_canvas.webp'
         ],
         sizes: [
           { size_code: 'M (40)', stock_quantity: 19, chest_measure_cm: 114, length_measure_cm: 74 },

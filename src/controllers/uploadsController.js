@@ -1,4 +1,10 @@
 import { cloudinary, isCloudinaryReady } from '../config/cloudinary.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Upload bank transfer slip or garment image to Cloudinary
@@ -82,7 +88,7 @@ export async function uploadProductImage(req, res, next) {
         data: {
           url: dataUri,
           public_id: `local_${Date.now()}`,
-          format: req.file.mimetype.split('/')[1] || 'jpg',
+          format: req.file.mimetype.split('/')[1] || 'webp',
           fileName: req.file.originalname
         }
       });
@@ -132,6 +138,30 @@ export async function uploadPopupAdImage(req, res, next) {
     }
 
     if (!isCloudinaryReady) {
+      try {
+        const ext = (req.file.originalname && req.file.originalname.includes('.')) 
+          ? req.file.originalname.split('.').pop().toLowerCase() 
+          : (req.file.mimetype ? req.file.mimetype.split('/')[1] : 'webp');
+        const filename = `ad_${Date.now()}.${ext}`;
+        const targetDir = path.resolve(__dirname, '../../../../frontend/public/images');
+
+        if (fs.existsSync(targetDir)) {
+          fs.writeFileSync(path.join(targetDir, filename), req.file.buffer);
+          return res.status(200).json({
+            success: true,
+            message: 'Ad image saved locally to public/images.',
+            data: {
+              url: `/images/${filename}`,
+              public_id: filename,
+              format: ext,
+              fileName: req.file.originalname
+            }
+          });
+        }
+      } catch (writeErr) {
+        console.warn('Local ad image disk write notice:', writeErr);
+      }
+
       const base64 = req.file.buffer.toString('base64');
       const dataUri = `data:${req.file.mimetype};base64,${base64}`;
 
@@ -141,7 +171,7 @@ export async function uploadPopupAdImage(req, res, next) {
         data: {
           url: dataUri,
           public_id: `local_ad_${Date.now()}`,
-          format: req.file.mimetype.split('/')[1] || 'jpg',
+          format: req.file.mimetype.split('/')[1] || 'webp',
           fileName: req.file.originalname
         }
       });

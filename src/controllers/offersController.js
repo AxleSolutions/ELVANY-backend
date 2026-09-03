@@ -19,7 +19,7 @@ function formatOffer(promo, productsMap = {}) {
     : Math.max(0, originalPrice - discountVal);
 
   const defaultVariant = targetProduct?.product_variants?.find(v => v.is_default) || targetProduct?.product_variants?.[0];
-  const galleryImage = defaultVariant?.gallery_images?.[0] || '/images/hero_tshirt.jpg';
+  const galleryImage = defaultVariant?.gallery_images?.[0] || '/images/hero_tshirt.webp';
 
   const sizes = defaultVariant?.product_stock?.map(s => s.size_code) || [
     'S (38)', 'M (40)', 'L (42)', 'XL (44)', 'XXL (46)'
@@ -43,8 +43,8 @@ function formatOffer(promo, productsMap = {}) {
     discountType: promo.discount_type || 'fixed_amount',
     discountValue: discountVal,
     minOrderAmount: parseFloat(promo.min_order_amount_lkr || 0),
-    remainingUnits: 6,
-    totalAllocation: 25,
+    remainingUnits: promo.remaining_units !== undefined ? promo.remaining_units : null,
+    totalAllocation: promo.total_allocation !== undefined ? promo.total_allocation : null,
     availableSizes: sizes,
     isActive: promo.is_active !== false,
     endsAt: promo.expires_at || promo.ends_at || null,
@@ -178,27 +178,25 @@ export async function updateOffer(req, res, next) {
       expires_at
     } = req.body;
 
-    const calculatedDiscount = discountValue !== undefined 
-      ? parseFloat(discountValue) 
-      : Math.max(0, (parseFloat(originalPriceLKR || 18500) - parseFloat(offerPriceLKR || 15500)));
-
-    const appliedProducts = productId ? [productId] : [];
     const resolvedExpiry = endsAt !== undefined ? endsAt : (expiresAt !== undefined ? expiresAt : expires_at);
 
-    const payload = {
-      code: (code || `ELVANY-${Date.now().toString().slice(-4)}`).toUpperCase().trim(),
-      title: title || productName || 'Privilege Allocation',
-      badge_label: (badge || 'SPECIAL PRIVILEGE').slice(0, 80),
-      discount_type: discountType === 'percentage' ? 'percentage' : 'fixed_amount',
-      discount_value: calculatedDiscount,
-      min_order_amount_lkr: parseFloat(minOrderAmount || 0),
-      applied_product_ids: appliedProducts
-    };
-
+    const payload = {};
+    if (code !== undefined) payload.code = code.toUpperCase().trim();
+    if (title !== undefined) payload.title = title;
+    if (badge !== undefined) payload.badge_label = (badge || '').slice(0, 80);
+    if (discountType !== undefined) payload.discount_type = discountType;
+    if (discountValue !== undefined) {
+      payload.discount_value = parseFloat(discountValue);
+    } else if (originalPriceLKR !== undefined && offerPriceLKR !== undefined) {
+      payload.discount_value = Math.max(0, parseFloat(originalPriceLKR) - parseFloat(offerPriceLKR));
+    }
+    if (minOrderAmount !== undefined) payload.min_order_amount_lkr = parseFloat(minOrderAmount);
+    if (productId !== undefined) {
+      payload.applied_product_ids = productId ? [productId] : [];
+    }
     if (resolvedExpiry !== undefined) {
       payload.expires_at = resolvedExpiry;
     }
-
     if (isActive !== undefined) {
       payload.is_active = isActive;
     }
