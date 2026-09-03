@@ -225,13 +225,19 @@ export async function updateProduct(req, res, next) {
 
     if (updateErr) throw updateErr;
 
-    // 2. Update variant images & colors
-    const images = Array.isArray(productData.images) && productData.images.length > 0
+    // 2. Update variant images across all product variants so deleted images do not persist
+    const images = Array.isArray(productData.images)
       ? productData.images
-      : [productData.image || '/images/hero_tshirt.webp'];
+      : (productData.image ? [productData.image] : ['/images/hero_tshirt.webp']);
 
     const defaultColorName = productData.color || (productData.colors?.[0]?.name) || 'Onyx Black';
     const defaultColorHex = productData.colorHex || (productData.colors?.[0]?.hex) || '#121316';
+
+    // Update gallery_images for ALL variants belonging to this product
+    await supabase
+      .from('product_variants')
+      .update({ gallery_images: images })
+      .eq('product_id', id);
 
     let { data: variant } = await supabase
       .from('product_variants')
@@ -244,7 +250,6 @@ export async function updateProduct(req, res, next) {
       await supabase
         .from('product_variants')
         .update({ 
-          gallery_images: images,
           color_name: defaultColorName,
           color_hex: defaultColorHex
         })

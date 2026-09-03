@@ -9,7 +9,7 @@ const DATA_FILE = path.join(__dirname, '../../data/popup_ad.json');
 
 const DEFAULT_POPUP_AD = {
   enabled: true,
-  imageUrl: '/images/editorial_brutalist.webp',
+  imageUrl: 'https://res.cloudinary.com/loy2zjsr/image/upload/v1788461849/elvany/popup_ads/dvoltmpm0p1dcpri5unn.webp',
   targetUrl: '/collection',
   altText: 'ELVANY Haute Couture Capsule Release',
   showOncePerSession: true,
@@ -20,7 +20,12 @@ function readLocalPopupAd() {
   try {
     if (fs.existsSync(DATA_FILE)) {
       const raw = fs.readFileSync(DATA_FILE, 'utf8');
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      // Discard any legacy local image path
+      if (parsed.imageUrl && parsed.imageUrl.startsWith('/images/')) {
+        parsed.imageUrl = DEFAULT_POPUP_AD.imageUrl;
+      }
+      return parsed;
     }
   } catch (err) {
     console.log('Local popup ad read note:', err);
@@ -59,9 +64,14 @@ export async function getPopupAd(req, res, next) {
             ? data.applied_product_ids[0]
             : '/collection';
 
+          let resolvedImageUrl = data.badge_label;
+          if (!resolvedImageUrl || resolvedImageUrl.startsWith('/images/')) {
+            resolvedImageUrl = DEFAULT_POPUP_AD.imageUrl;
+          }
+
           const dbSettings = {
             enabled: data.is_active !== false,
-            imageUrl: data.badge_label || '/images/editorial_brutalist.webp',
+            imageUrl: resolvedImageUrl,
             targetUrl: targetUrl || '/collection',
             altText: data.title || 'ELVANY Seasonal Advertisement',
             showOncePerSession: true,
@@ -94,7 +104,7 @@ export async function updatePopupAd(req, res, next) {
 
     const updatedData = {
       enabled: enabled !== false,
-      imageUrl: imageUrl || '/images/editorial_brutalist.webp',
+      imageUrl: (imageUrl && !imageUrl.startsWith('/images/')) ? imageUrl : DEFAULT_POPUP_AD.imageUrl,
       targetUrl: targetUrl || '/collection',
       altText: altText || 'ELVANY Seasonal Advertisement',
       showOncePerSession: showOncePerSession !== false,

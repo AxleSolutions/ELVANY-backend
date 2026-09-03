@@ -36,12 +36,15 @@ export async function createOrder(req, res, next) {
     }
 
     const isCard = (paymentMethod || '').toLowerCase().includes('card') || (paymentMethod || '').toLowerCase().includes('payhere');
-    const isQr = (paymentMethod || '').toLowerCase().includes('qr');
-    const isBankTransfer = (paymentMethod || '').toLowerCase().includes('bank');
-    const isBankOrQr = isQr || isBankTransfer;
+    const isQr = (paymentMethod || '').toLowerCase().includes('qr') || (paymentMethod || '').toLowerCase().includes('lanka');
+    const isCod = (paymentMethod || '').toLowerCase().includes('cod') || (paymentMethod || '').toLowerCase().includes('cash');
+    const isBankTransfer = (paymentMethod || '').toLowerCase().includes('bank') || (!isCard && !isQr && !isCod);
+
     const initialStatus = isCard
-      ? (req.body.isPaid ? 'Payment Verified — Processing Dispatch' : 'Payment Verified — Processing Dispatch')
-      : isBankOrQr
+      ? 'Payment Verified — Processing Dispatch'
+      : isCod
+      ? 'Payment Verified — Processing Dispatch'
+      : isQr || isBankTransfer
       ? 'Pending Slip Verification'
       : 'Payment Verified — Processing Dispatch';
 
@@ -50,6 +53,15 @@ export async function createOrder(req, res, next) {
     const grandTotal = Number(grandTotalLKR || totalLKR || (subtotal + deliveryFee));
 
     const userId = req.user?.id || null;
+
+    const detectedPaymentType = isCard ? 'card' : isQr ? 'lanka_qr' : isCod ? 'cod' : 'bank_transfer';
+    const detectedSpecificMethod = isCard 
+      ? 'PayHere Secure Online Card Payment' 
+      : isQr 
+      ? 'LankaQR Instant Transfer' 
+      : isCod 
+      ? 'Cash on Delivery (COD)' 
+      : 'Direct Bank Transfer';
 
     // Construct full delivery address payload with rich item specs preserved
     const structuredAddress = {
@@ -66,8 +78,8 @@ export async function createOrder(req, res, next) {
       country: deliveryAddress?.country || 'Sri Lanka',
       deliveryNotes: deliveryNotes || deliveryAddress?.deliveryNotes || '',
       deliveryFeeLKR: deliveryFee,
-      paymentType: isCard ? 'card' : isQr ? 'lanka_qr' : 'bank_transfer',
-      specificPaymentMethod: isCard ? 'PayHere Secure Online Card Payment' : isQr ? 'LankaQR Instant Transfer' : 'Direct Bank Transfer',
+      paymentType: detectedPaymentType,
+      specificPaymentMethod: detectedSpecificMethod,
       isGift: Boolean(isGift),
       giftMessage: giftMessage || '',
       orderedItems: items || []
@@ -84,7 +96,7 @@ export async function createOrder(req, res, next) {
           customer_email: customerEmail,
           customer_phone: customerPhone || '',
           delivery_address: structuredAddress,
-          payment_method: isCard ? 'card' : 'bank_transfer',
+          payment_method: isCard ? 'card' : isCod ? 'cod' : 'bank_transfer',
           status: initialStatus,
 
           subtotal_lkr: subtotal,
@@ -264,10 +276,19 @@ export async function getOrders(req, res, next) {
       });
 
       const trackingNumber = o.tracking_number || o.delivery_address?.trackingNumber || (o.courier_notes?.match(/(?:Citypak|Tracking|Citypak Tracking)[\s:]*([A-Za-z0-9\-]+)/i)?.[1]) || o.courier_notes || null;
+      const subtotalLKR = parseFloat(o.subtotal_lkr || 0);
+      const deliveryFeeLKR = parseFloat(o.delivery_address?.deliveryFeeLKR || 0);
+      const savingsLKR = parseFloat(o.discount_lkr || 0);
+      const grandTotalLKR = parseFloat(o.grand_total_lkr || (subtotalLKR + deliveryFeeLKR - savingsLKR) || 0);
 
       return {
         ...o,
         orderId: o.order_code,
+        subtotalLKR,
+        deliveryFeeLKR,
+        savingsLKR,
+        grandTotalLKR,
+        totalLKR: grandTotalLKR,
         trackingNumber,
         tracking_number: trackingNumber,
         items: lineItems.length > 0 ? lineItems : storedItems

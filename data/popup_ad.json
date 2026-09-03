@@ -1,8 +1,8 @@
 {
   "enabled": true,
-  "imageUrl": "/images/editorial_brutalist.webp",
+  "imageUrl": "https://res.cloudinary.com/loy2zjsr/image/upload/v1788461849/elvany/popup_ads/dvoltmpm0p1dcpri5unn.webp",
   "targetUrl": "/collection",
   "altText": "Test Large Payload",
   "showOncePerSession": true,
-  "updatedAt": "2026-09-03T13:30:39.431Z"
+  "updatedAt": "2026-09-03T18:57:30.759Z"
 }
