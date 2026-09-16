@@ -137,9 +137,9 @@ export async function getPayHerePaymentParams(req, res) {
 
     // Item description summary for statement
     const itemCount = Array.isArray(items) ? items.length : 1;
-    const itemDescription = itemCount > 0 
-      ? `Maison ELVANY Haute Luxury Acquisition (${itemCount} Item${itemCount > 1 ? 's' : ''})`
-      : 'Maison ELVANY Luxury Apparel Order';
+    const itemDescription = itemCount > 0
+      ? `Maison ELVANY Haute Acquisition (${itemCount} Item${itemCount > 1 ? 's' : ''})`
+      : 'Maison ELVANY Apparel Order';
 
     res.status(200).json({
       success: true,

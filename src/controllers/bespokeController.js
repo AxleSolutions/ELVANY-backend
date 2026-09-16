@@ -222,7 +222,7 @@ export async function createBespokeDesign(req, res, next) {
       id: generatedId,
       designCode: finalDesignCode,
       orderId: orderId || null,
-      fabricName: fabricName || '240 GSM Luxury Supima Cotton',
+      fabricName: fabricName || '240 GSM Signature Supima Cotton',
       fabricGsm: fabricGsm || '240 GSM',
       cutName: cutName || 'Classic Regular Fit',
       cutId: cutId || 'tailored',

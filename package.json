@@ -1,7 +1,7 @@
 {
   "name": "elvany-backend",
   "version": "1.0.0",
-  "description": "Maison ELVANY — Haute Luxury Backend API (Supabase & Cloudinary)",
+  "description": "Maison ELVANY — Haute Couture Backend API (Supabase & Cloudinary)",
   "main": "server.js",
   "type": "module",
   "scripts": {

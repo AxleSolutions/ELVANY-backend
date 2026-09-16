@@ -64,7 +64,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.get('/api/health', (req, res) => {
   res.status(200).json({
     status: 'online',
-    service: 'Maison ELVANY Luxury API Server',
+    service: 'Maison ELVANY API Server',
     database: isSupabaseReady ? 'Supabase Connected' : 'Development Fallback Mode',
     mediaStorage: isCloudinaryReady ? 'Cloudinary Connected' : 'Local Fallback Mode',
     timestamp: new Date().toISOString()

@@ -5,6 +5,12 @@ import {
   confirmCardOrder,
   getPaymentConfig
 } from '../controllers/paymentController.js';
+import {
+  initiateKokoOrder,
+  handleKokoNotify,
+  verifyKokoOrder,
+  getKokoConfig
+} from '../controllers/kokoController.js';
 
 const router = express.Router();
 
@@ -19,5 +25,21 @@ router.post('/confirm-card-order', confirmCardOrder);
 
 // Gateway configuration and sandbox test card information
 router.get('/config', getPaymentConfig);
+
+// ==========================================
+// KOKO BUY NOW PAY LATER (BNPL) ROUTES
+// ==========================================
+
+// Initiate Koko payment session with RSA signature
+router.post('/koko-initiate', initiateKokoOrder);
+
+// Koko server-to-server webhook callback
+router.post('/koko-notify', handleKokoNotify);
+
+// Verify Koko order status via orderView API
+router.get('/koko-verify/:orderId', verifyKokoOrder);
+
+// Get Koko configuration & surcharge rate
+router.get('/koko-config', getKokoConfig);
 
 export default router;

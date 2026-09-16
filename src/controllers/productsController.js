@@ -184,7 +184,7 @@ export async function createProduct(req, res, next) {
 
     res.status(201).json({
       success: true,
-      message: 'Luxury garment successfully created in atelier database.',
+      message: 'Atelier garment successfully created in database.',
       data: fullProduct || insertedProduct
     });
   } catch (err) {
