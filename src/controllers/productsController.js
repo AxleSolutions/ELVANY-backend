@@ -112,16 +112,21 @@ export async function createProduct(req, res, next) {
         sku,
         slug,
         title: productData.title,
-        subtitle: productData.subtitle || productData.silhouette || 'Noble Cotton Atelier Edition',
+        subtitle: productData.subtitle || productData.silhouette || 'Signature Atelier Edition',
         category: productData.category || 'heavyweight',
-        silhouette: productData.silhouette || 'Boxy Drop-Shoulder',
+        silhouette: productData.silhouette || productData.fit || 'Tailored Regular Fit',
         base_price_lkr: price,
         original_price_lkr: parseFloat(productData.originalPriceLKR || price),
         is_active: productData.status !== 'Draft',
         is_offer_applied: Boolean(productData.isOfferApplied),
-        fabric_composition: productData.composition || productData.fabric || '100% Noble Long-Staple Cotton',
-        fabric_weight: productData.gsm ? `${productData.gsm} GSM` : (productData.weight || '280 GSM'),
-        description: productData.description || 'Crafted in Florence and finished with minimalist atelier precision.'
+        fabric_composition: productData.composition || productData.fabric || 'Durable Comfort Knit Blend',
+        fabric_weight: productData.gsm ? `${productData.gsm} GSM` : (productData.weight || '240 GSM'),
+        description: productData.description || 'Crafted with precision comfort yarns and finished with clean minimalist tailoring.',
+        craftsmanship_details: [
+          productData.collarSpec || 'Double-needle non-sag 1x1 ribbing',
+          productData.fit || productData.silhouette || 'Tailored Regular Fit',
+          productData.origin || 'Sri Lanka'
+        ]
       })
       .select()
       .single();
@@ -210,14 +215,19 @@ export async function updateProduct(req, res, next) {
         title: productData.title,
         subtitle: productData.subtitle || productData.silhouette,
         category: productData.category,
-        silhouette: productData.silhouette,
+        silhouette: productData.silhouette || productData.fit,
         base_price_lkr: price,
         original_price_lkr: parseFloat(productData.originalPriceLKR || price),
         is_active: productData.status !== 'Draft',
         is_offer_applied: Boolean(productData.isOfferApplied),
         fabric_composition: productData.composition || productData.fabric,
         fabric_weight: productData.gsm ? `${productData.gsm} GSM` : productData.weight,
-        description: productData.description
+        description: productData.description,
+        craftsmanship_details: [
+          productData.collarSpec || 'Double-needle non-sag 1x1 ribbing',
+          productData.fit || productData.silhouette || 'Tailored Regular Fit',
+          productData.origin || 'Sri Lanka'
+        ]
       })
       .eq('id', id)
       .select()
