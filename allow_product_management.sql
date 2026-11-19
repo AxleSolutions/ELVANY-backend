@@ -63,3 +63,45 @@ CREATE POLICY "Allow public update product_stock" ON public.product_stock
 DROP POLICY IF EXISTS "Allow public delete product_stock" ON public.product_stock;
 CREATE POLICY "Allow public delete product_stock" ON public.product_stock 
     FOR DELETE USING (true);
+
+
+-- 4. Enable Full Access to promotions (Special Privileges & Entrance Popup Ad)
+ALTER TABLE public.promotions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public read promotions" ON public.promotions;
+CREATE POLICY "Allow public read promotions" ON public.promotions 
+    FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Allow public insert promotions" ON public.promotions;
+CREATE POLICY "Allow public insert promotions" ON public.promotions 
+    FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public update promotions" ON public.promotions;
+CREATE POLICY "Allow public update promotions" ON public.promotions 
+    FOR UPDATE USING (true);
+
+DROP POLICY IF EXISTS "Allow public delete promotions" ON public.promotions;
+CREATE POLICY "Allow public delete promotions" ON public.promotions 
+    FOR DELETE USING (true);
+
+
+-- 5. Enable Full Access to reviews (Client Evaluations & Photo Submissions)
+ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public read published reviews" ON public.reviews;
+DROP POLICY IF EXISTS "Allow public read reviews" ON public.reviews;
+CREATE POLICY "Allow public read reviews" ON public.reviews 
+    FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Allow public insert reviews" ON public.reviews;
+CREATE POLICY "Allow public insert reviews" ON public.reviews 
+    FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public update reviews" ON public.reviews;
+CREATE POLICY "Allow public update reviews" ON public.reviews 
+    FOR UPDATE USING (true);
+
+DROP POLICY IF EXISTS "Allow public delete reviews" ON public.reviews;
+CREATE POLICY "Allow public delete reviews" ON public.reviews 
+    FOR DELETE USING (true);
+

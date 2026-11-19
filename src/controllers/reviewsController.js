@@ -76,6 +76,45 @@ export async function createReview(req, res, next) {
         }
       }
 
+      // Check for duplicate review for this order and garment (Only one review permitted per purchased garment)
+      if (resolvedOrderId || orderId) {
+        try {
+          const { data: existingList } = await supabase
+            .from('reviews')
+            .select('id, comment, order_id, product_id');
+
+          if (Array.isArray(existingList) && existingList.length > 0) {
+            const cleanOrd = (orderId || '').toUpperCase().trim();
+            const cleanProd = (productId || '').toLowerCase().trim();
+            const hasDuplicate = existingList.some((r) => {
+              const orderMatches = (resolvedOrderId && r.order_id === resolvedOrderId) ||
+                                  (cleanOrd && r.comment && r.comment.toUpperCase().includes(`[ORDER: ${cleanOrd}]`));
+              const prodMatches = (resolvedProductId && r.product_id === resolvedProductId) ||
+                                 (cleanProd && r.comment && r.comment.toLowerCase().includes(`[item: ${cleanProd}]`));
+              return orderMatches && (prodMatches || !cleanProd);
+            });
+
+            if (hasDuplicate) {
+              return res.status(409).json({
+                success: false,
+                message: `An authenticated evaluation for Order #${orderId} and this garment has already been recorded.`
+              });
+            }
+          }
+        } catch (dupErr) {
+          console.warn('Duplicate review check notice:', dupErr);
+        }
+      }
+
+      // Tag order and item identifiers in comment so they persist regardless of foreign key schema
+      let taggedComment = resolvedComment;
+      if (orderId && !taggedComment.includes(`[Order: ${orderId}]`)) {
+        taggedComment = `${taggedComment}\n\n[Order: ${orderId}]`;
+      }
+      if (productId && !taggedComment.includes(`[Item: ${productId}]`)) {
+        taggedComment = `${taggedComment} [Item: ${productId}]`;
+      }
+
       // First attempt: insert with image_url and images columns
       let review = null;
       let insertError = null;
@@ -91,7 +130,7 @@ export async function createReview(req, res, next) {
             client_location: resolvedLocation,
             rating: Number(rating) || 5,
             title: title || 'Verified Atelier Review',
-            comment: resolvedComment,
+            comment: taggedComment,
             image_url: resolvedImageUrl,
             images: resolvedImages,
             is_verified_buyer: true,
@@ -179,12 +218,28 @@ export async function getAllReviews(req, res, next) {
         cleanComment = cleanComment.replace(/\[Client Photo:\s*[^\]]+\]/i, '').trim();
       }
 
+      const orderTagMatch = cleanComment.match(/\[Order:\s*([^\]]+)\]/i);
+      const parsedOrderId = orderTagMatch ? orderTagMatch[1].trim() : null;
+      const itemTagMatch = cleanComment.match(/\[Item:\s*([^\]]+)\]/i);
+      const parsedProductId = itemTagMatch ? itemTagMatch[1].trim() : null;
+
+      if (orderTagMatch) {
+        cleanComment = cleanComment.replace(/\[Order:\s*[^\]]+\]/i, '').trim();
+      }
+      if (itemTagMatch) {
+        cleanComment = cleanComment.replace(/\[Item:\s*[^\]]+\]/i, '').trim();
+      }
+
+      const resolvedOrderId = parsedOrderId || r.order_id;
+      const resolvedProdId = parsedProductId || r.product_id;
+
       return {
         id: r.id,
-        productId: r.product_id,
-        product_id: r.product_id,
-        orderId: r.order_id,
-        order_id: r.order_id,
+        productId: resolvedProdId,
+        product_id: resolvedProdId,
+        orderId: resolvedOrderId,
+        order_id: resolvedOrderId,
+        orderCode: resolvedOrderId,
         customerName: r.client_name || r.customer_name || 'VIP Client',
         author: r.client_name || r.customer_name || 'VIP Client',
         customerEmail: r.customer_email || 'client@elvany.com',
