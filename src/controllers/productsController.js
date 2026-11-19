@@ -296,14 +296,20 @@ export async function updateProduct(req, res, next) {
         .eq('id', variant.id);
 
       if (productData.inventory && typeof productData.inventory === 'object') {
-        for (const [sizeCode, qty] of Object.entries(productData.inventory)) {
+        try {
           await supabase
             .from('product_stock')
-            .upsert({
-              variant_id: variant.id,
-              size_code: cleanSizeCode(sizeCode),
-              stock_quantity: isSoldOutExplicit ? 0 : Math.max(0, parseInt(qty, 10) || 0)
-            }, { onConflict: 'variant_id,size_code' });
+            .delete()
+            .eq('variant_id', variant.id);
+        } catch {}
+
+        const stockRows = Object.entries(productData.inventory).map(([sizeCode, qty]) => ({
+          variant_id: variant.id,
+          size_code: cleanSizeCode(sizeCode),
+          stock_quantity: isSoldOutExplicit ? 0 : Math.max(0, parseInt(qty, 10) || 0)
+        }));
+        if (stockRows.length > 0) {
+          await supabase.from('product_stock').insert(stockRows);
         }
       }
     } else {

@@ -105,3 +105,41 @@ DROP POLICY IF EXISTS "Allow public delete reviews" ON public.reviews;
 CREATE POLICY "Allow public delete reviews" ON public.reviews 
     FOR DELETE USING (true);
 
+
+-- 6. Enable Full Access to restock_requests (Demand Hub & Re-Issue Submissions)
+CREATE TABLE IF NOT EXISTS public.restock_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    product_id UUID REFERENCES public.products(id) ON DELETE SET NULL,
+    product_title TEXT NOT NULL,
+    product_image TEXT,
+    variant_color TEXT DEFAULT 'Onyx Black',
+    size_code TEXT DEFAULT 'M',
+    customer_name TEXT NOT NULL,
+    customer_email TEXT,
+    customer_phone TEXT,
+    notes TEXT,
+    status TEXT DEFAULT 'Pending Atelier Review',
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.restock_requests ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow read restock requests" ON public.restock_requests;
+DROP POLICY IF EXISTS "Allow public read restock requests" ON public.restock_requests;
+CREATE POLICY "Allow public read restock requests" ON public.restock_requests 
+    FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Allow public insert restock requests" ON public.restock_requests;
+CREATE POLICY "Allow public insert restock requests" ON public.restock_requests 
+    FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow update restock requests" ON public.restock_requests;
+DROP POLICY IF EXISTS "Allow public update restock requests" ON public.restock_requests;
+CREATE POLICY "Allow public update restock requests" ON public.restock_requests 
+    FOR UPDATE USING (true);
+
+DROP POLICY IF EXISTS "Allow delete restock requests" ON public.restock_requests;
+DROP POLICY IF EXISTS "Allow public delete restock requests" ON public.restock_requests;
+CREATE POLICY "Allow public delete restock requests" ON public.restock_requests 
+    FOR DELETE USING (true);
+
