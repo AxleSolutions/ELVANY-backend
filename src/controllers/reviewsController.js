@@ -13,12 +13,16 @@ export async function createReview(req, res, next) {
       author,
       clientLocation,
       location,
-      fitRating
+      fitRating,
+      imageUrl,
+      images
     } = req.body;
 
     const resolvedComment = comment || content;
     const resolvedName = clientName || author || 'Verified Client';
     const resolvedLocation = clientLocation || location || 'Sri Lanka';
+    const resolvedImageUrl = imageUrl || (Array.isArray(images) && images[0]) || null;
+    const resolvedImages = Array.isArray(images) && images.length > 0 ? images : (resolvedImageUrl ? [resolvedImageUrl] : []);
 
     if (!resolvedComment) {
       return res.status(400).json({
@@ -72,29 +76,69 @@ export async function createReview(req, res, next) {
         }
       }
 
-      const { data: review, error } = await supabase
-        .from('reviews')
-        .insert({
-          product_id: resolvedProductId,
-          order_id: resolvedOrderId,
-          user_id: req.user?.id || null,
-          client_name: resolvedName,
-          client_location: resolvedLocation,
-          rating: Number(rating) || 5,
-          title: title || 'Verified Atelier Review',
-          comment: resolvedComment,
-          is_verified_buyer: true,
-          status: 'published'
-        })
-        .select()
-        .single();
+      // First attempt: insert with image_url and images columns
+      let review = null;
+      let insertError = null;
 
-      if (error) throw error;
+      try {
+        const insertRes = await supabase
+          .from('reviews')
+          .insert({
+            product_id: resolvedProductId,
+            order_id: resolvedOrderId,
+            user_id: req.user?.id || null,
+            client_name: resolvedName,
+            client_location: resolvedLocation,
+            rating: Number(rating) || 5,
+            title: title || 'Verified Atelier Review',
+            comment: resolvedComment,
+            image_url: resolvedImageUrl,
+            images: resolvedImages,
+            is_verified_buyer: true,
+            status: 'published'
+          })
+          .select()
+          .single();
+
+        review = insertRes.data;
+        insertError = insertRes.error;
+      } catch (colErr) {
+        insertError = colErr;
+      }
+
+      // If column image_url/images does not exist yet in table, fallback to tagging comment
+      if (insertError) {
+        console.info('Retrying review insert with comment photo tag fallback:', insertError.message);
+        const taggedComment = resolvedImageUrl ? `${resolvedComment}\n\n[Client Photo: ${resolvedImageUrl}]` : resolvedComment;
+        const retryRes = await supabase
+          .from('reviews')
+          .insert({
+            product_id: resolvedProductId,
+            order_id: resolvedOrderId,
+            user_id: req.user?.id || null,
+            client_name: resolvedName,
+            client_location: resolvedLocation,
+            rating: Number(rating) || 5,
+            title: title || 'Verified Atelier Review',
+            comment: taggedComment,
+            is_verified_buyer: true,
+            status: 'published'
+          })
+          .select()
+          .single();
+
+        if (retryRes.error) throw retryRes.error;
+        review = retryRes.data;
+      }
 
       return res.status(201).json({
         success: true,
         message: 'Review published successfully to database.',
-        data: review
+        data: {
+          ...review,
+          imageUrl: resolvedImageUrl,
+          images: resolvedImages
+        }
       });
     }
 
@@ -123,27 +167,43 @@ export async function getAllReviews(req, res, next) {
 
     if (error) throw error;
 
-    const formatted = (reviews || []).map(r => ({
-      id: r.id,
-      productId: r.product_id,
-      product_id: r.product_id,
-      orderId: r.order_id,
-      order_id: r.order_id,
-      customerName: r.client_name || r.customer_name || 'VIP Client',
-      author: r.client_name || r.customer_name || 'VIP Client',
-      customerEmail: r.customer_email || 'client@elvany.com',
-      title: r.title || 'Exceptional Quality',
-      productTitle: r.products?.title || r.product_title || r.title || 'Heavyweight Atelier Tee',
-      rating: Number(r.rating) || 5,
-      fitRating: r.fit_rating || 'True to Atelier Boxy Spec',
-      comment: r.comment || '',
-      content: r.comment || '',
-      location: r.client_location || 'Colombo, Sri Lanka',
-      date: new Date(r.created_at || Date.now()).toLocaleDateString(),
-      status: r.status === 'published' ? 'Approved' : (r.status || 'Approved'),
-      isFeatured: r.is_featured || false,
-      helpfulCount: r.helpful_votes || 0
-    }));
+    const formatted = (reviews || []).map(r => {
+      let imgUrl = r.image_url || r.imageUrl || null;
+      let imgs = Array.isArray(r.images) && r.images.length > 0 ? r.images : (imgUrl ? [imgUrl] : []);
+      let cleanComment = r.comment || '';
+
+      const photoMatch = cleanComment.match(/\[Client Photo:\s*([^\]]+)\]/i);
+      if (photoMatch) {
+        if (!imgUrl) imgUrl = photoMatch[1].trim();
+        if (imgs.length === 0) imgs = [photoMatch[1].trim()];
+        cleanComment = cleanComment.replace(/\[Client Photo:\s*[^\]]+\]/i, '').trim();
+      }
+
+      return {
+        id: r.id,
+        productId: r.product_id,
+        product_id: r.product_id,
+        orderId: r.order_id,
+        order_id: r.order_id,
+        customerName: r.client_name || r.customer_name || 'VIP Client',
+        author: r.client_name || r.customer_name || 'VIP Client',
+        customerEmail: r.customer_email || 'client@elvany.com',
+        title: r.title || 'Exceptional Quality',
+        productTitle: r.products?.title || r.product_title || r.title || 'Heavyweight Atelier Tee',
+        rating: Number(r.rating) || 5,
+        fitRating: r.fit_rating || 'True to Atelier Boxy Spec',
+        comment: cleanComment,
+        content: cleanComment,
+        imageUrl: imgUrl,
+        image_url: imgUrl,
+        images: imgs,
+        location: r.client_location || 'Colombo, Sri Lanka',
+        date: new Date(r.created_at || Date.now()).toLocaleDateString(),
+        status: r.status === 'published' ? 'Approved' : (r.status || 'Approved'),
+        isFeatured: r.is_featured || false,
+        helpfulCount: r.helpful_votes || 0
+      };
+    });
 
     res.status(200).json({ success: true, data: formatted });
 
