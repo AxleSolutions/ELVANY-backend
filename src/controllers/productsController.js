@@ -1,5 +1,15 @@
 import { supabase, isSupabaseReady } from '../config/supabase.js';
 
+function cleanSizeCode(code) {
+  if (!code || typeof code !== 'string') return '';
+  let cleaned = code
+    .replace(/\s*\([^)]*\)\s*\d*/g, '')
+    .replace(/\s+\d+$/g, '')
+    .trim();
+  if (cleaned.toUpperCase() === 'XXL') cleaned = '2XL';
+  return cleaned || code;
+}
+
 export async function getProducts(req, res, next) {
   try {
     if (!isSupabaseReady) {
@@ -113,7 +123,7 @@ export async function createProduct(req, res, next) {
         slug,
         title: productData.title,
         subtitle: productData.subtitle || productData.silhouette || 'Signature Atelier Edition',
-        category: productData.category || 'heavyweight',
+        category: productData.category || 'classic-crewneck',
         silhouette: productData.silhouette || productData.fit || 'Tailored Regular Fit',
         base_price_lkr: price,
         original_price_lkr: parseFloat(productData.originalPriceLKR || price),
@@ -122,10 +132,19 @@ export async function createProduct(req, res, next) {
         fabric_composition: productData.composition || productData.fabric || 'Durable Comfort Knit Blend',
         fabric_weight: productData.gsm ? `${productData.gsm} GSM` : (productData.weight || '240 GSM'),
         description: productData.description || 'Crafted with precision comfort yarns and finished with clean minimalist tailoring.',
+        care_instructions: Array.isArray(productData.care) && productData.care.length > 0 
+          ? productData.care 
+          : (Array.isArray(productData.care_instructions) && productData.care_instructions.length > 0 
+            ? productData.care_instructions 
+            : [
+              'Machine wash cold (30°C) with like dark colors. Do not bleach.',
+              'Flat dry in shade to preserve fabric elasticity and color depth.'
+            ]),
         craftsmanship_details: [
           productData.collarSpec || 'Double-needle non-sag 1x1 ribbing',
           productData.fit || productData.silhouette || 'Tailored Regular Fit',
-          productData.origin || 'Sri Lanka'
+          productData.origin || 'Sri Lanka',
+          productData.status || (productData.is_active === false ? 'Draft' : 'Active')
         ]
       })
       .select()
@@ -143,6 +162,7 @@ export async function createProduct(req, res, next) {
       : [{ name: productData.color || 'Onyx Black', hex: productData.colorHex || '#121316', isDefault: true }];
 
     let primaryVariantId = null;
+    const isSoldOutExplicit = productData.status === 'Sold Out' || productData.status === 'Archived';
 
     for (let i = 0; i < colorsList.length; i++) {
       const col = colorsList[i];
@@ -169,8 +189,8 @@ export async function createProduct(req, res, next) {
         if (productData.inventory && typeof productData.inventory === 'object') {
           const stockRows = Object.entries(productData.inventory).map(([sizeCode, qty]) => ({
             variant_id: variant.id,
-            size_code: sizeCode,
-            stock_quantity: Math.max(0, parseInt(qty, 10) || 0)
+            size_code: cleanSizeCode(sizeCode),
+            stock_quantity: isSoldOutExplicit ? 0 : Math.max(0, parseInt(qty, 10) || 0)
           }));
 
           if (stockRows.length > 0) {
@@ -223,10 +243,19 @@ export async function updateProduct(req, res, next) {
         fabric_composition: productData.composition || productData.fabric,
         fabric_weight: productData.gsm ? `${productData.gsm} GSM` : productData.weight,
         description: productData.description,
+        care_instructions: Array.isArray(productData.care) && productData.care.length > 0 
+          ? productData.care 
+          : (Array.isArray(productData.care_instructions) && productData.care_instructions.length > 0 
+            ? productData.care_instructions 
+            : [
+              'Machine wash cold (30°C) with like dark colors. Do not bleach.',
+              'Flat dry in shade to preserve fabric elasticity and color depth.'
+            ]),
         craftsmanship_details: [
           productData.collarSpec || 'Double-needle non-sag 1x1 ribbing',
           productData.fit || productData.silhouette || 'Tailored Regular Fit',
-          productData.origin || 'Sri Lanka'
+          productData.origin || 'Sri Lanka',
+          productData.status || (productData.is_active === false ? 'Draft' : 'Active')
         ]
       })
       .eq('id', id)
@@ -242,6 +271,7 @@ export async function updateProduct(req, res, next) {
 
     const defaultColorName = productData.color || (productData.colors?.[0]?.name) || 'Onyx Black';
     const defaultColorHex = productData.colorHex || (productData.colors?.[0]?.hex) || '#121316';
+    const isSoldOutExplicit = productData.status === 'Sold Out' || productData.status === 'Archived';
 
     // Update gallery_images for ALL variants belonging to this product
     await supabase
@@ -271,8 +301,8 @@ export async function updateProduct(req, res, next) {
             .from('product_stock')
             .upsert({
               variant_id: variant.id,
-              size_code: sizeCode,
-              stock_quantity: Math.max(0, parseInt(qty, 10) || 0)
+              size_code: cleanSizeCode(sizeCode),
+              stock_quantity: isSoldOutExplicit ? 0 : Math.max(0, parseInt(qty, 10) || 0)
             }, { onConflict: 'variant_id,size_code' });
         }
       }
@@ -293,8 +323,8 @@ export async function updateProduct(req, res, next) {
       if (newVar && productData.inventory && typeof productData.inventory === 'object') {
         const stockRows = Object.entries(productData.inventory).map(([sizeCode, qty]) => ({
           variant_id: newVar.id,
-          size_code: sizeCode,
-          stock_quantity: Math.max(0, parseInt(qty, 10) || 0)
+          size_code: cleanSizeCode(sizeCode),
+          stock_quantity: isSoldOutExplicit ? 0 : Math.max(0, parseInt(qty, 10) || 0)
         }));
         if (stockRows.length > 0) {
           await supabase.from('product_stock').insert(stockRows);

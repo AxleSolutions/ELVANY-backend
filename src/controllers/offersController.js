@@ -22,7 +22,7 @@ function formatOffer(promo, productsMap = {}) {
   const galleryImage = defaultVariant?.gallery_images?.[0] || '/images/hero_tshirt.webp';
 
   const sizes = defaultVariant?.product_stock?.map(s => s.size_code) || [
-    'S (38)', 'M (40)', 'L (42)', 'XL (44)', 'XXL (46)'
+    'XS', 'S', 'M', 'L', 'XL', '2XL'
   ];
 
   return {

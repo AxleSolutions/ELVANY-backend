@@ -132,7 +132,7 @@ export async function createOrder(req, res, next) {
           product_id: matchedProdId,
           product_title: item.title || item.name || 'Haute Atelier Garment',
           color: item.color || 'Onyx Black',
-          size: item.selectedSize || item.size || 'M (40)',
+          size: typeof (item.selectedSize || item.size) === 'string' ? (item.selectedSize || item.size).replace(/\s*\([^)]*\)\s*\d*/g, '').trim() : 'M',
           unit_price_lkr: unitPrice,
           original_price_lkr: origPrice,
           quantity: parseInt(item.quantity || item.qty || 1, 10),

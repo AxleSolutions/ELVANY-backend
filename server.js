@@ -14,6 +14,7 @@ import popupAdRoutes from './src/routes/popupAdRoutes.js';
 import restockRoutes from './src/routes/restockRoutes.js';
 import bespokeRoutes from './src/routes/bespokeRoutes.js';
 import paymentRoutes from './src/routes/paymentRoutes.js';
+import categoriesRoutes from './src/routes/categoriesRoutes.js';
 import { errorHandler } from './src/middlewares/errorHandler.js';
 import { isSupabaseReady } from './src/config/supabase.js';
 import { isCloudinaryReady } from './src/config/cloudinary.js';
@@ -104,6 +105,9 @@ app.use('/bespoke', bespokeRoutes);
 
 app.use('/api/payment', paymentRoutes);
 app.use('/payment', paymentRoutes);
+
+app.use('/api/categories', categoriesRoutes);
+app.use('/categories', categoriesRoutes);
 
 
 
