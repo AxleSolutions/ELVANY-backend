@@ -110,7 +110,11 @@ export async function createOffer(req, res, next) {
       isActive = true,
       endsAt,
       expiresAt,
-      expires_at
+      expires_at,
+      remainingUnits,
+      remaining_units,
+      totalAllocation,
+      total_allocation
     } = req.body;
 
     const calculatedDiscount = discountValue !== undefined 
@@ -119,6 +123,12 @@ export async function createOffer(req, res, next) {
 
     const appliedProducts = productId ? [productId] : [];
     const resolvedExpiry = endsAt || expiresAt || expires_at || null;
+    const finalRemain = remainingUnits !== undefined ? parseInt(remainingUnits, 10) : (remaining_units !== undefined ? parseInt(remaining_units, 10) : undefined);
+    const finalTotal = totalAllocation !== undefined ? parseInt(totalAllocation, 10) : (total_allocation !== undefined ? parseInt(total_allocation, 10) : undefined);
+
+    const isExpired = resolvedExpiry ? (new Date(resolvedExpiry).getTime() <= Date.now()) : false;
+    const isOutOfStock = finalRemain !== undefined && finalRemain <= 0;
+    const shouldApplyToProduct = isActive !== false && !isExpired && !isOutOfStock;
 
     const payload = {
       code: (code || `ELVANY-${Date.now().toString().slice(-4)}`).toUpperCase().trim(),
@@ -132,6 +142,9 @@ export async function createOffer(req, res, next) {
       expires_at: resolvedExpiry
     };
 
+    if (finalRemain !== undefined) payload.remaining_units = finalRemain;
+    if (finalTotal !== undefined) payload.total_allocation = finalTotal;
+
     const { data, error } = await supabase
       .from('promotions')
       .insert(payload)
@@ -144,7 +157,7 @@ export async function createOffer(req, res, next) {
     if (productId) {
       await supabase
         .from('products')
-        .update({ is_offer_applied: true })
+        .update({ is_offer_applied: shouldApplyToProduct })
         .eq('id', productId);
     }
 
@@ -175,10 +188,20 @@ export async function updateOffer(req, res, next) {
       isActive,
       endsAt,
       expiresAt,
-      expires_at
+      expires_at,
+      remainingUnits,
+      remaining_units,
+      totalAllocation,
+      total_allocation
     } = req.body;
 
     const resolvedExpiry = endsAt !== undefined ? endsAt : (expiresAt !== undefined ? expiresAt : expires_at);
+    const finalRemain = remainingUnits !== undefined ? parseInt(remainingUnits, 10) : (remaining_units !== undefined ? parseInt(remaining_units, 10) : undefined);
+    const finalTotal = totalAllocation !== undefined ? parseInt(totalAllocation, 10) : (total_allocation !== undefined ? parseInt(total_allocation, 10) : undefined);
+
+    const isExpired = resolvedExpiry ? (new Date(resolvedExpiry).getTime() <= Date.now()) : false;
+    const isOutOfStock = finalRemain !== undefined && finalRemain <= 0;
+    const shouldApplyToProduct = isActive !== false && !isExpired && !isOutOfStock;
 
     const payload = {};
     if (code !== undefined) payload.code = code.toUpperCase().trim();
@@ -200,6 +223,8 @@ export async function updateOffer(req, res, next) {
     if (isActive !== undefined) {
       payload.is_active = isActive;
     }
+    if (finalRemain !== undefined) payload.remaining_units = finalRemain;
+    if (finalTotal !== undefined) payload.total_allocation = finalTotal;
 
     const { data, error } = await supabase
       .from('promotions')
@@ -209,6 +234,13 @@ export async function updateOffer(req, res, next) {
       .single();
 
     if (error) throw error;
+
+    if (productId) {
+      await supabase
+        .from('products')
+        .update({ is_offer_applied: shouldApplyToProduct })
+        .eq('id', productId);
+    }
 
     res.status(200).json({ success: true, data });
   } catch (err) {
@@ -235,6 +267,14 @@ export async function toggleOfferStatus(req, res, next) {
 
     if (error) throw error;
 
+    // If turned off, deactivate offer on linked product
+    if (isActive === false && Array.isArray(data?.applied_product_ids) && data.applied_product_ids.length > 0) {
+      await supabase
+        .from('products')
+        .update({ is_offer_applied: false })
+        .in('id', data.applied_product_ids);
+    }
+
     res.status(200).json({ success: true, data });
   } catch (err) {
     next(err);
@@ -248,6 +288,20 @@ export async function deleteOffer(req, res, next) {
     }
 
     const { id } = req.params;
+
+    // Get offer first to find linked products
+    const { data: promo } = await supabase
+      .from('promotions')
+      .select('applied_product_ids')
+      .eq('id', id)
+      .single();
+
+    if (Array.isArray(promo?.applied_product_ids) && promo.applied_product_ids.length > 0) {
+      await supabase
+        .from('products')
+        .update({ is_offer_applied: false })
+        .in('id', promo.applied_product_ids);
+    }
 
     const { error } = await supabase
       .from('promotions')

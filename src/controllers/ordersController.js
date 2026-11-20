@@ -73,7 +73,7 @@ export async function createOrder(req, res, next) {
       phone: customerPhone || deliveryAddress?.phone || '',
       streetAddress: deliveryAddress?.streetAddress || customerLocation || '',
       apartment: deliveryAddress?.apartment || '',
-      city: deliveryAddress?.city || 'Colombo',
+      city: deliveryAddress?.city || '',
       postalCode: deliveryAddress?.postalCode || '',
       country: deliveryAddress?.country || 'Sri Lanka',
       deliveryNotes: deliveryNotes || deliveryAddress?.deliveryNotes || '',

@@ -159,7 +159,7 @@ export async function getPayHerePaymentParams(req, res) {
         email: customerEmail || deliveryAddress?.email || 'client@elvany.com',
         phone: customerPhone || deliveryAddress?.phone || '+94771234567',
         address: deliveryAddress?.streetAddress || deliveryAddress?.location || 'Maison Residence',
-        city: deliveryAddress?.city || 'Colombo',
+        city: deliveryAddress?.city || '',
         country: deliveryAddress?.country || 'Sri Lanka'
       }
     });

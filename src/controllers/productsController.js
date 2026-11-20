@@ -32,6 +32,7 @@ export async function getProducts(req, res, next) {
     const now = new Date();
     const activePromos = (promotions || []).filter(pr => {
       if (pr.expires_at && new Date(pr.expires_at) < now) return false;
+      if (pr.remaining_units !== undefined && pr.remaining_units !== null && Number(pr.remaining_units) <= 0) return false;
       return true;
     });
 
@@ -40,8 +41,7 @@ export async function getProducts(req, res, next) {
       const basePrice = parseFloat(p.base_price_lkr || origPrice);
 
       const matchedPromo = activePromos.find(pr => 
-        (Array.isArray(pr.applied_product_ids) && pr.applied_product_ids.includes(p.id)) ||
-        (p.is_offer_applied && activePromos.length === 1)
+        (Array.isArray(pr.applied_product_ids) && pr.applied_product_ids.includes(p.id))
       );
 
       if (matchedPromo) {

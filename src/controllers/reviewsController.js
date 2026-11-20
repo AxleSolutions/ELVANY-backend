@@ -252,7 +252,7 @@ export async function getAllReviews(req, res, next) {
         imageUrl: imgUrl,
         image_url: imgUrl,
         images: imgs,
-        location: r.client_location || 'Colombo, Sri Lanka',
+        location: r.client_location || 'Sri Lanka',
         date: new Date(r.created_at || Date.now()).toLocaleDateString(),
         status: r.status === 'published' ? 'Approved' : (r.status || 'Approved'),
         isFeatured: r.is_featured || false,
