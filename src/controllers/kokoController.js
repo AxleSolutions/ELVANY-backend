@@ -67,7 +67,7 @@ export function buildKokoDataString(params) {
     reference,
     firstName = 'Customer',
     lastName = 'Guest',
-    email = 'concierge@elvany.com',
+    email = 'elvanywear@gmail.com',
     description = 'ELVANY Order',
     apiKey,
     responseUrl
@@ -110,7 +110,7 @@ export async function initiateKokoOrder(req, res) {
       currency = 'LKR',
       firstName = 'Customer',
       lastName = 'Guest',
-      email = 'concierge@elvany.com',
+      email = 'elvanywear@gmail.com',
       description = 'ELVANY Order',
       returnUrl,
       cancelUrl,
@@ -149,7 +149,7 @@ export async function initiateKokoOrder(req, res) {
       reference,
       firstName: (firstName || 'Customer').trim(),
       lastName: (lastName || 'ELVANY').trim(),
-      email: (email || 'concierge@elvany.com').trim(),
+      email: (email || 'elvanywear@gmail.com').trim(),
       description: (description || 'ELVANY Bespoke Order').trim(),
       apiKey: KOKO_API_KEY,
       responseUrl: finalResponseUrl
