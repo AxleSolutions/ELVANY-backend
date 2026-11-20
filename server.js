@@ -15,6 +15,7 @@ import restockRoutes from './src/routes/restockRoutes.js';
 import bespokeRoutes from './src/routes/bespokeRoutes.js';
 import paymentRoutes from './src/routes/paymentRoutes.js';
 import categoriesRoutes from './src/routes/categoriesRoutes.js';
+import authRoutes from './src/routes/authRoutes.js';
 import { errorHandler } from './src/middlewares/errorHandler.js';
 import { isSupabaseReady } from './src/config/supabase.js';
 import { isCloudinaryReady } from './src/config/cloudinary.js';
@@ -93,6 +94,9 @@ app.use('/newsletter', newsletterRoutes);
 
 app.use('/api/cart', cartRoutes);
 app.use('/cart', cartRoutes);
+
+app.use('/api/auth', authRoutes);
+app.use('/auth', authRoutes);
 
 app.use('/api/popup-ad', popupAdRoutes);
 app.use('/popup-ad', popupAdRoutes);
