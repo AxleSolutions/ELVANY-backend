@@ -6,7 +6,7 @@ import { cloudinary, isCloudinaryReady } from './src/config/cloudinary.js';
 
 async function testConnections() {
   console.log('\n======================================================');
-  console.log(' 🔍 TESTING MAISON ELVANY EXTERNAL SERVICES');
+  console.log(' 🔍 TESTING ELVANY EXTERNAL SERVICES');
   console.log('======================================================\n');
 
   // 1. Test Cloudinary

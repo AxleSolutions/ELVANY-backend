@@ -1,5 +1,5 @@
 export function errorHandler(err, req, res, next) {
-  console.error('[Maison Backend Error]:', err);
+  console.error('[Backend Error]:', err);
 
   const statusCode = err.status || err.statusCode || 500;
   res.status(statusCode).json({

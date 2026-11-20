@@ -138,8 +138,8 @@ export async function getPayHerePaymentParams(req, res) {
     // Item description summary for statement
     const itemCount = Array.isArray(items) ? items.length : 1;
     const itemDescription = itemCount > 0
-      ? `Maison ELVANY Haute Acquisition (${itemCount} Item${itemCount > 1 ? 's' : ''})`
-      : 'Maison ELVANY Apparel Order';
+      ? `ELVANY Haute Acquisition (${itemCount} Item${itemCount > 1 ? 's' : ''})`
+      : 'ELVANY Apparel Order';
 
     res.status(200).json({
       success: true,
@@ -158,7 +158,7 @@ export async function getPayHerePaymentParams(req, res) {
         last_name: lastName,
         email: customerEmail || deliveryAddress?.email || 'client@elvany.com',
         phone: customerPhone || deliveryAddress?.phone || '+94771234567',
-        address: deliveryAddress?.streetAddress || deliveryAddress?.location || 'Maison Residence',
+        address: deliveryAddress?.streetAddress || deliveryAddress?.location || 'Residence',
         city: deliveryAddress?.city || '',
         country: deliveryAddress?.country || 'Sri Lanka'
       }

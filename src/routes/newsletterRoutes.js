@@ -85,7 +85,7 @@ router.post('/subscribe', async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: 'Email successfully subscribed to Maison ELVANY capsule invitations.',
+      message: 'Email successfully subscribed to ELVANY capsule invitations.',
       subscriber: subscriberRecord,
       totalCount: subscribers.length
     });

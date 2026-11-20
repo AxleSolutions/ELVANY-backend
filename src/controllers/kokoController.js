@@ -68,7 +68,7 @@ export function buildKokoDataString(params) {
     firstName = 'Customer',
     lastName = 'Guest',
     email = 'concierge@elvany.com',
-    description = 'Maison ELVANY Order',
+    description = 'ELVANY Order',
     apiKey,
     responseUrl
   } = params;
@@ -111,7 +111,7 @@ export async function initiateKokoOrder(req, res) {
       firstName = 'Customer',
       lastName = 'Guest',
       email = 'concierge@elvany.com',
-      description = 'Maison ELVANY Order',
+      description = 'ELVANY Order',
       returnUrl,
       cancelUrl,
       items = []
@@ -148,9 +148,9 @@ export async function initiateKokoOrder(req, res) {
       orderId: String(orderId),
       reference,
       firstName: (firstName || 'Customer').trim(),
-      lastName: (lastName || 'Maison').trim(),
+      lastName: (lastName || 'ELVANY').trim(),
       email: (email || 'concierge@elvany.com').trim(),
-      description: (description || 'Maison ELVANY Bespoke Order').trim(),
+      description: (description || 'ELVANY Bespoke Order').trim(),
       apiKey: KOKO_API_KEY,
       responseUrl: finalResponseUrl
     });

@@ -107,7 +107,7 @@ export async function getOffers(req, res, next) {
     let query = supabase
       .from('promotions')
       .select('*')
-      .neq('code', 'MAISON_RESTOCK_REGISTRY')
+      .not('code', 'ilike', '%RESTOCK_REGISTRY%')
       .order('created_at', { ascending: false });
 
     if (req.query.activeOnly === 'true') {

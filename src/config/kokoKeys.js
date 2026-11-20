@@ -1,5 +1,5 @@
 /**
- * Maison ELVANY — Koko Payment Gateway RSA Keys Configuration
+ * ELVANY — Koko Payment Gateway RSA Keys Configuration
  */
 
 export const KOKO_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
