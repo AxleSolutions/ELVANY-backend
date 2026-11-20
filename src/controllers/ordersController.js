@@ -80,6 +80,9 @@ export async function createOrder(req, res, next) {
       deliveryFeeLKR: deliveryFee,
       paymentType: detectedPaymentType,
       specificPaymentMethod: detectedSpecificMethod,
+      voucherCode: req.body.voucherCode || req.body.appliedVoucher?.code || null,
+      voucherDiscountLKR: parseFloat(req.body.voucherDiscountLKR || 0),
+      appliedVoucher: req.body.appliedVoucher || null,
       isGift: Boolean(isGift),
       giftMessage: giftMessage || '',
       orderedItems: items || []
@@ -278,8 +281,10 @@ export async function getOrders(req, res, next) {
       const trackingNumber = o.tracking_number || o.delivery_address?.trackingNumber || (o.courier_notes?.match(/(?:Citypak|Tracking|Citypak Tracking)[\s:]*([A-Za-z0-9\-]+)/i)?.[1]) || o.courier_notes || null;
       const subtotalLKR = parseFloat(o.subtotal_lkr || 0);
       const deliveryFeeLKR = parseFloat(o.delivery_address?.deliveryFeeLKR || 0);
-      const savingsLKR = parseFloat(o.discount_lkr || 0);
-      const grandTotalLKR = parseFloat(o.grand_total_lkr || (subtotalLKR + deliveryFeeLKR - savingsLKR) || 0);
+      const savingsLKR = parseFloat(o.savings_lkr ?? o.delivery_address?.savingsLKR ?? o.discount_lkr ?? 0);
+      const voucherDiscountLKR = parseFloat(o.voucher_discount_lkr ?? o.delivery_address?.voucherDiscountLKR ?? o.delivery_address?.voucher_discount_lkr ?? 0);
+      const voucherCode = o.voucher_code || o.delivery_address?.voucherCode || o.delivery_address?.voucher_code || o.delivery_address?.appliedVoucher?.code || null;
+      const grandTotalLKR = parseFloat(o.grand_total_lkr || (subtotalLKR + deliveryFeeLKR - savingsLKR - voucherDiscountLKR) || 0);
 
       return {
         ...o,
@@ -287,6 +292,9 @@ export async function getOrders(req, res, next) {
         subtotalLKR,
         deliveryFeeLKR,
         savingsLKR,
+        voucherCode,
+        voucherDiscountLKR,
+        appliedVoucher: o.delivery_address?.appliedVoucher || null,
         grandTotalLKR,
         totalLKR: grandTotalLKR,
         trackingNumber,
