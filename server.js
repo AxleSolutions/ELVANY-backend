@@ -16,6 +16,7 @@ import bespokeRoutes from './src/routes/bespokeRoutes.js';
 import paymentRoutes from './src/routes/paymentRoutes.js';
 import categoriesRoutes from './src/routes/categoriesRoutes.js';
 import authRoutes from './src/routes/authRoutes.js';
+import vouchersRoutes from './src/routes/vouchersRoutes.js';
 import { errorHandler } from './src/middlewares/errorHandler.js';
 import { isSupabaseReady } from './src/config/supabase.js';
 import { isCloudinaryReady } from './src/config/cloudinary.js';
@@ -112,6 +113,9 @@ app.use('/payment', paymentRoutes);
 
 app.use('/api/categories', categoriesRoutes);
 app.use('/categories', categoriesRoutes);
+
+app.use('/api/vouchers', vouchersRoutes);
+app.use('/vouchers', vouchersRoutes);
 
 
 
