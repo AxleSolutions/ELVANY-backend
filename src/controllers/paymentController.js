@@ -48,18 +48,6 @@ export const SANDBOX_TEST_CARDS = [
     scenario: 'Insufficient Funds Simulation'
   }
 ];
-    expiry: '12/28',
-    cvv: '1234',
-    scenario: 'Successful Payment'
-  },
-  {
-    type: 'Visa (Insufficient Funds)',
-    number: '4024007194349121',
-    expiry: '12/28',
-    cvv: '123',
-    scenario: 'Insufficient Funds Simulation'
-  }
-];
 
 /**
  * Generate MD5 Hash required by PayHere JavaScript SDK & Form Checkout
@@ -331,10 +319,12 @@ export async function confirmCardOrder(req, res) {
  * GET /api/payment/config
  */
 export async function getPaymentConfig(req, res) {
+  const isSandbox = isSandboxDefault;
+  const merchantId = process.env.PAYHERE_MERCHANT_ID || DEFAULT_MERCHANT_ID;
   res.status(200).json({
     success: true,
     isSandbox,
-    merchantId: MERCHANT_ID,
+    merchantId,
     currency: 'LKR',
     testCards: isSandbox ? SANDBOX_TEST_CARDS : []
   });
