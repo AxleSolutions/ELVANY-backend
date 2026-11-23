@@ -1,13 +1,21 @@
+import path from 'path';
+import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
 import { supabase, isSupabaseReady } from '../config/supabase.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Explicitly load .env from backend directory and root workspace
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 dotenv.config();
 
-const MERCHANT_ID = process.env.PAYHERE_MERCHANT_ID || '1211149';
-const MERCHANT_SECRET = process.env.PAYHERE_MERCHANT_SECRET || '4MTY4NTQ2OTkyOTM1NjExMjE1MjgxNDU5Mjc0MjMzMjE5MDM2MTk=';
-const PAYHERE_MODE = (process.env.PAYHERE_MODE || 'sandbox').toLowerCase();
-const isSandbox = PAYHERE_MODE !== 'live' && PAYHERE_MODE !== 'production';
+const DEFAULT_MERCHANT_ID = process.env.PAYHERE_MERCHANT_ID || '1232176';
+const DEFAULT_MERCHANT_SECRET = process.env.PAYHERE_MERCHANT_SECRET || 'MjMyMjU1NTQ2NTY1NDkxNzgyMjM5OTEwMDk4NjYxNTkwMjk1ODU2';
+const DEFAULT_PAYHERE_MODE = (process.env.PAYHERE_MODE || 'sandbox').toLowerCase();
+const isSandboxDefault = DEFAULT_PAYHERE_MODE !== 'live' && DEFAULT_PAYHERE_MODE !== 'production';
 
 // Official PayHere Sandbox Test Cards for quick reference & UI testing
 export const SANDBOX_TEST_CARDS = [
@@ -28,6 +36,18 @@ export const SANDBOX_TEST_CARDS = [
   {
     type: 'AMEX',
     number: '346781005510225',
+    expiry: '12/28',
+    cvv: '1234',
+    scenario: 'Successful Payment'
+  },
+  {
+    type: 'Visa (Insufficient Funds)',
+    number: '4024007194349121',
+    expiry: '12/28',
+    cvv: '123',
+    scenario: 'Insufficient Funds Simulation'
+  }
+];
     expiry: '12/28',
     cvv: '1234',
     scenario: 'Successful Payment'
@@ -89,9 +109,9 @@ export function verifyPayHereSignature(merchantId, orderId, payhereAmount, payhe
  */
 export async function getPayHerePaymentParams(req, res) {
   try {
-    const merchantId = process.env.PAYHERE_MERCHANT_ID || MERCHANT_ID;
-    const merchantSecret = process.env.PAYHERE_MERCHANT_SECRET || MERCHANT_SECRET;
-    const currentMode = (process.env.PAYHERE_MODE || 'sandbox').toLowerCase();
+    const merchantId = process.env.PAYHERE_MERCHANT_ID || DEFAULT_MERCHANT_ID;
+    const merchantSecret = process.env.PAYHERE_MERCHANT_SECRET || DEFAULT_MERCHANT_SECRET;
+    const currentMode = (process.env.PAYHERE_MODE || DEFAULT_PAYHERE_MODE || 'sandbox').toLowerCase();
     const isCurrentlySandbox = currentMode !== 'live' && currentMode !== 'production';
 
     const {
@@ -130,7 +150,7 @@ export async function getPayHerePaymentParams(req, res) {
     const firstName = deliveryAddress?.firstName || names[0] || 'Valued';
     const lastName = deliveryAddress?.lastName || names.slice(1).join(' ') || 'Client';
 
-    const cleanOrigin = (req.get('origin') || process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/+$/, '');
+    const cleanOrigin = ((req.get && req.get('origin')) || (req.headers && req.headers.origin) || process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/+$/, '');
     const returnUrl = `${cleanOrigin}/checkout?order=${encodeURIComponent(orderId)}&status=success`;
     const cancelUrl = `${cleanOrigin}/checkout?order=${encodeURIComponent(orderId)}&status=cancel`;
     const notifyUrl = process.env.PAYHERE_NOTIFY_URL || `${cleanOrigin.replace('5173', '5000')}/api/payment/payhere-notify`;
@@ -144,8 +164,8 @@ export async function getPayHerePaymentParams(req, res) {
     res.status(200).json({
       success: true,
       data: {
-        sandbox: isSandbox,
-        merchant_id: MERCHANT_ID,
+        sandbox: isCurrentlySandbox,
+        merchant_id: merchantId,
         return_url: returnUrl,
         cancel_url: cancelUrl,
         notify_url: notifyUrl,

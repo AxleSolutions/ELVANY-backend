@@ -2,6 +2,16 @@ import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Ensure .env is loaded before importing routes and controllers
+dotenv.config({ path: path.resolve(__dirname, '.env') });
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+dotenv.config();
 
 import ordersRoutes from './src/routes/ordersRoutes.js';
 import productsRoutes from './src/routes/productsRoutes.js';
@@ -20,8 +30,6 @@ import vouchersRoutes from './src/routes/vouchersRoutes.js';
 import { errorHandler } from './src/middlewares/errorHandler.js';
 import { isSupabaseReady } from './src/config/supabase.js';
 import { isCloudinaryReady } from './src/config/cloudinary.js';
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
