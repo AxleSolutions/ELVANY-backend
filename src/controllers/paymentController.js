@@ -138,10 +138,15 @@ export async function getPayHerePaymentParams(req, res) {
     const firstName = deliveryAddress?.firstName || names[0] || 'Valued';
     const lastName = deliveryAddress?.lastName || names.slice(1).join(' ') || 'Client';
 
-    const cleanOrigin = ((req.get && req.get('origin')) || (req.headers && req.headers.origin) || process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/+$/, '');
+    const cleanOrigin = ((req.get && req.get('origin')) || (req.headers && req.headers.origin) || process.env.CLIENT_URL || 'https://elvany.lk').replace(/\/+$/, '');
     const returnUrl = `${cleanOrigin}/checkout?order=${encodeURIComponent(orderId)}&status=success`;
     const cancelUrl = `${cleanOrigin}/checkout?order=${encodeURIComponent(orderId)}&status=cancel`;
-    const notifyUrl = process.env.PAYHERE_NOTIFY_URL || `${cleanOrigin.replace('5173', '5000')}/api/payment/payhere-notify`;
+    
+    // Auto-detect backend host for server-to-server notify webhook (e.g. on Render)
+    const reqHost = (req.get && req.get('host')) || (req.headers && req.headers.host) || '';
+    const reqProto = (req.headers && req.headers['x-forwarded-proto']) || req.protocol || 'https';
+    const autoBackendUrl = reqHost ? `${reqProto}://${reqHost}` : cleanOrigin.replace('5173', '5000');
+    const notifyUrl = process.env.PAYHERE_NOTIFY_URL || `${autoBackendUrl}/api/payment/payhere-notify`;
 
     // Item description summary for statement
     const itemCount = Array.isArray(items) ? items.length : 1;
